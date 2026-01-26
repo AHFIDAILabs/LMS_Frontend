@@ -1,65 +1,109 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { Navbar } from '@/components/layout/NavBar'
+import { HeroSection } from '@/components/sections/HeroSection'
+import { CurriculumSection } from '@/components/sections/CurriculumSection'
+import { FeaturesSection } from '@/components/sections/FeaturesSection'
+import { ProcessSection } from '@/components/sections/ProcessSection'
+import { StatsSection } from '@/components/sections/StatsSection'
+import { CTASection } from '@/components/sections/CTASection'
+import { Footer } from "@/components/layout/Footer"
+import { InstructorsSection } from '@/components/sections/ourInstructor'
+
+export default function HomePage() {
+  const curriculum = [
+    {
+      week: 'Week 1-2',
+      title: 'AI Foundations',
+      description: 'Python programming, ML fundamentals, and data structures for AI applications',
+      duration: '10h',
+      lessons: 12,
+    },
+    {
+      week: 'Week 3-4',
+      title: 'Machine Learning',
+      description: 'Supervised and unsupervised learning, model training and evaluation',
+      duration: '12h',
+      lessons: 15,
+    },
+    {
+      week: 'Week 5-6',
+      title: 'Deep Learning',
+      description: 'Neural networks, CNNs, RNNs with TensorFlow and PyTorch',
+      duration: '12h',
+      lessons: 14,
+    },
+    {
+      week: 'Week 7-8',
+      title: 'NLP & Vision',
+      description: 'Natural language processing and computer vision applications',
+      duration: '10h',
+      lessons: 12,
+    },
+    {
+      week: 'Week 9-10',
+      title: 'Production AI',
+      description: 'Deployment, MLOps, scaling, and best practices',
+      duration: '10h',
+      lessons: 10,
+    },
+    {
+      week: 'Week 11-12',
+      title: 'Capstone Project',
+      description: 'Build and deploy your production-ready AI application',
+      duration: '20h',
+      lessons: 1,
+    },
+  ]
+
+  const features = [
+    {
+      icon: '📚',
+      title: 'Comprehensive Materials',
+      description: 'Access course content, code samples, and documentation',
+    },
+    {
+      icon: '👨‍🏫',
+      title: 'Expert Instructors',
+      description: 'Learn from industry professionals with real experience',
+    },
+    {
+      icon: '🎓',
+      title: 'Certification',
+      description: 'Earn a recognized certificate upon completion',
+    },
+    {
+      icon: '💻',
+      title: 'Hands-on Projects',
+      description: 'Build real AI applications throughout the program',
+    },
+    {
+      icon: '🤝',
+      title: 'Community Support',
+      description: 'Connect with peers and get help when needed',
+    },
+    {
+      icon: '📊',
+      title: 'Progress Tracking',
+      description: 'Monitor your learning journey with analytics',
+    },
+  ]
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    <main className="min-h-screen bg-[#2A434E]">
+      <Navbar />
+      
+      <div className="pt-2 flex content-center items-center justify-center bg-[#2A434E]">
+        <HeroSection />
+      </div>
+
+      <CurriculumSection modules={curriculum} />
+      <FeaturesSection features={features} />
+      <ProcessSection />
+      <StatsSection />
+      <InstructorsSection instructors={[]} />
+      <CTASection />
+      <Footer />
+    </main>
+  )
 }
