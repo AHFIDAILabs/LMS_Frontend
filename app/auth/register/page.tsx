@@ -7,43 +7,171 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/lib/context/AuthContext'
 
+// Password strength requirements
+interface PasswordStrength {
+  score: number
+  message: string
+  color: string
+  requirements: {
+    length: boolean
+    uppercase: boolean
+    lowercase: boolean
+    number: boolean
+    special: boolean
+  }
+}
+
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [error, setError] = useState('')
+  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength | null>(null)
   
   const router = useRouter()
   const { register: registerUser, loading } = useAuth()
+
+  // Validate email format
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  // Sanitize input to prevent XSS
+  const sanitizeInput = (input: string): string => {
+    return input.trim().replace(/[<>]/g, '')
+  }
+
+  // Validate name fields
+  const validateName = (name: string): boolean => {
+    // Only letters, spaces, hyphens, and apostrophes
+    const nameRegex = /^[a-zA-Z\s'-]+$/
+    return nameRegex.test(name) && name.length >= 2 && name.length <= 50
+  }
+
+  // Check password strength
+  const checkPasswordStrength = (pwd: string): PasswordStrength => {
+    const requirements = {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      lowercase: /[a-z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+    }
+
+    const metRequirements = Object.values(requirements).filter(Boolean).length
+    
+    let score = 0
+    let message = ''
+    let color = ''
+
+    if (metRequirements <= 2) {
+      score = 1
+      message = 'Weak'
+      color = 'text-red-500'
+    } else if (metRequirements === 3) {
+      score = 2
+      message = 'Fair'
+      color = 'text-orange-500'
+    } else if (metRequirements === 4) {
+      score = 3
+      message = 'Good'
+      color = 'text-yellow-500'
+    } else {
+      score = 4
+      message = 'Strong'
+      color = 'text-green-500'
+    }
+
+    return { score, message, color, requirements }
+  }
+
+  // Handle password change
+  const handlePasswordChange = (pwd: string) => {
+    setPassword(pwd)
+    if (pwd.length > 0) {
+      setPasswordStrength(checkPasswordStrength(pwd))
+    } else {
+      setPasswordStrength(null)
+    }
+  }
+
+  // Validate form
+  const validateForm = (): boolean => {
+    // Name validation
+    if (!validateName(firstName)) {
+      setError('First name must be 2-50 characters and contain only letters')
+      return false
+    }
+
+    if (!validateName(lastName)) {
+      setError('Last name must be 2-50 characters and contain only letters')
+      return false
+    }
+
+    // Email validation
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address')
+      return false
+    }
+
+    // Password validation
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long')
+      return false
+    }
+
+    if (password.length > 128) {
+      setError('Password must not exceed 128 characters')
+      return false
+    }
+
+    // Check password strength requirements
+    const strength = checkPasswordStrength(password)
+    if (!strength.requirements.uppercase || !strength.requirements.lowercase || !strength.requirements.number) {
+      setError('Password must contain uppercase, lowercase, and numbers')
+      return false
+    }
+
+    // Password match validation
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return false
+    }
+
+    // Terms validation
+    if (!agreeTerms) {
+      setError('Please accept the terms and conditions')
+      return false
+    }
+
+    return true
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    // Validation
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
+    // Validate form
+    if (!validateForm()) {
       return
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long')
-      return
-    }
-
-    if (!agreeTerms) {
-      setError('Please accept the terms and conditions')
-      return
-    }
+    // Sanitize inputs (except password)
+    const sanitizedFirstName = sanitizeInput(firstName)
+    const sanitizedLastName = sanitizeInput(lastName)
+    const sanitizedEmail = sanitizeInput(email)
 
     try {
       await registerUser({ 
-        firstName, 
-        lastName, 
-        email, 
+        firstName: sanitizedFirstName, 
+        lastName: sanitizedLastName, 
+        email: sanitizedEmail, 
         password 
       })
       // Navigation is handled in AuthContext
@@ -65,67 +193,66 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-slate-900 flex">
       {/* Left Side - Welcome Section */}
-<div
-  className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12 overflow-hidden rounded-l-xl"
-  style={{
-    backgroundImage: "url('/images/Dr.Kay4.jpeg')",
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  }}
->
-  {/* Overlay for readability */}
-  <div className="absolute inset-0 bg-black/60" />
+      <div
+        className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12 overflow-hidden rounded-l-xl"
+        style={{
+          backgroundImage: "url('/images/Dr.Kay4.jpeg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        {/* Overlay for readability */}
+        <div className="absolute inset-0 bg-black/60" />
 
-  {/* Ambient glows */}
-  <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 blur-[140px] rounded-full animate-pulse" />
-  <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-lime-500/10 blur-[140px] rounded-full animate-pulse delay-1000" />
+        {/* Ambient glows */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 blur-[140px] rounded-full animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-lime-500/10 blur-[140px] rounded-full animate-pulse delay-1000" />
 
-  {/* Decorative spheres */}
-  <div className="absolute inset-0 flex items-center justify-center opacity-20">
-    <div className="w-[500px] h-[500px] rounded-full border border-emerald-500/20" />
-    <div className="absolute w-[400px] h-[400px] rounded-full border border-lime-500/30" />
-    <div className="absolute w-[300px] h-[300px] rounded-full border border-[#EFB14A]/40" />
-  </div>
-
-  <div className="relative z-10 max-w-md text-start">
-    <h1 className="text-5xl font-bold text-white mb-6">
-      Join the Future<br />of AI Learning
-    </h1>
-    <p className="text-gray-300 text-lg leading-relaxed mb-8">
-      Start your journey in artificial intelligence. Build, learn, and innovate with our comprehensive program.
-    </p>
-
-    {/* Benefits */}
-    <div className="space-y-4">
-      <div className="flex items-center space-x-3">
-        <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
-          <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        {/* Decorative spheres */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-20">
+          <div className="w-[500px] h-[500px] rounded-full border border-emerald-500/20" />
+          <div className="absolute w-[400px] h-[400px] rounded-full border border-lime-500/30" />
+          <div className="absolute w-[300px] h-[300px] rounded-full border border-[#EFB14A]/40" />
         </div>
-        <span className="text-gray-300">Access to all courses</span>
-      </div>
-      <div className="flex items-center space-x-3">
-        <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
-          <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <span className="text-gray-300">Certificate upon completion</span>
-      </div>
-      <div className="flex items-center space-x-3">
-        <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
-          <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <span className="text-gray-300">Community support</span>
-      </div>
-    </div>
-  </div>
-</div>
 
+        <div className="relative z-10 max-w-md text-start">
+          <h1 className="text-5xl font-bold text-white mb-6">
+            Join the Future<br />of AI Learning
+          </h1>
+          <p className="text-gray-300 text-lg leading-relaxed mb-8">
+            Start your journey in artificial intelligence. Build, learn, and innovate with our comprehensive program.
+          </p>
+
+          {/* Benefits */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
+                <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-gray-300">Access to all courses</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
+                <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-gray-300">Certificate upon completion</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-full bg-lime-500/10 border border-lime-500/30 flex items-center justify-center">
+                <svg className="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-gray-300">Community support</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Right Side - Register Form */}
       <div className="flex-1 flex items-center justify-center p-8 relative overflow-y-auto">
@@ -162,90 +289,189 @@ export default function RegisterPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">
                   First Name
                 </label>
                 <Input
+                  id="firstName"
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
                   required
                   disabled={loading}
+                  autoComplete="given-name"
+                  minLength={2}
+                  maxLength={50}
                   className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">
                   Last Name
                 </label>
                 <Input
+                  id="lastName"
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
                   required
                   disabled={loading}
+                  autoComplete="family-name"
+                  minLength={2}
+                  maxLength={50}
                   className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Address
               </label>
               <Input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
                 required
                 disabled={loading}
+                autoComplete="email"
+                maxLength={100}
                 className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                disabled={loading}
-                className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
-              />
-              <p className="mt-1 text-xs text-gray-500">Must be at least 8 characters</p>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  disabled={loading}
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              
+              {/* Password Strength Indicator */}
+              {passwordStrength && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Password strength:</span>
+                    <span className={`text-xs font-semibold ${passwordStrength.color}`}>
+                      {passwordStrength.message}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-1.5">
+                    <div 
+                      className={`h-1.5 rounded-full transition-all ${
+                        passwordStrength.score === 1 ? 'bg-red-500 w-1/4' :
+                        passwordStrength.score === 2 ? 'bg-orange-500 w-2/4' :
+                        passwordStrength.score === 3 ? 'bg-yellow-500 w-3/4' :
+                        'bg-green-500 w-full'
+                      }`}
+                    />
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <div className={`flex items-center space-x-2 ${passwordStrength.requirements.length ? 'text-green-400' : 'text-gray-500'}`}>
+                      <span>{passwordStrength.requirements.length ? '✓' : '○'}</span>
+                      <span>At least 8 characters</span>
+                    </div>
+                    <div className={`flex items-center space-x-2 ${passwordStrength.requirements.uppercase ? 'text-green-400' : 'text-gray-500'}`}>
+                      <span>{passwordStrength.requirements.uppercase ? '✓' : '○'}</span>
+                      <span>One uppercase letter</span>
+                    </div>
+                    <div className={`flex items-center space-x-2 ${passwordStrength.requirements.lowercase ? 'text-green-400' : 'text-gray-500'}`}>
+                      <span>{passwordStrength.requirements.lowercase ? '✓' : '○'}</span>
+                      <span>One lowercase letter</span>
+                    </div>
+                    <div className={`flex items-center space-x-2 ${passwordStrength.requirements.number ? 'text-green-400' : 'text-gray-500'}`}>
+                      <span>{passwordStrength.requirements.number ? '✓' : '○'}</span>
+                      <span>One number</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
                 Confirm Password
               </label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                disabled={loading}
-                className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  disabled={loading}
+                >
+                  {showConfirmPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+              )}
             </div>
 
             {/* Terms Checkbox */}
             <div className="flex items-start space-x-3">
               <input
-                type="checkbox"
                 id="terms"
+                type="checkbox"
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
                 disabled={loading}

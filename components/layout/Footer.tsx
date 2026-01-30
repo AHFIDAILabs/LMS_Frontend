@@ -10,7 +10,7 @@ export function Footer() {
                 <span className="text-black font-bold text-2xl">A</span>
               </div>
               <div>
-                <div className="text-lg font-bold text-white">AI ACCELERATOR</div>
+                <div className="text-lg font-bold text-white">AI4SID~Academy</div>
                 <div className="text-xs text-gray-500">Innovation Program</div>
               </div>
             </div>

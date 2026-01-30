@@ -1,9 +1,9 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, RegisterData } from '@/types'
-import api from '@/lib/api'
+import { authService } from '@/services/authService'
+import { User, RegisterData } from '@/types/user'
 
 interface AuthContextType {
   user: User | null
@@ -13,158 +13,185 @@ interface AuthContextType {
   logout: () => Promise<void>
   updateProfile: (data: any) => Promise<void>
   refreshUser: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
+  refreshAuthToken: () => Promise<void>
   isAuthenticated: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
+  // Track if component is mounted (client-side only)
   useEffect(() => {
-    checkAuth()
+    setMounted(true)
   }, [])
 
-  const checkAuth = async () => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-      
-      if (!token) {
-        setLoading(false)
-        return
-      }
+  const clearAuthStorage = useCallback(() => {
+    authService.clearTokens()
+    setUser(null)
+  }, [])
 
-      const response: any = await api.auth.getCurrentUser()
-      
-      if (response?.success && response?.data) {
-        setUser(response.data)
+const refreshUser = useCallback(async () => {
+  // 1. If we are on the server, we can't check localStorage/cookies easily here
+  if (typeof window === 'undefined') return;
+
+  try {
+    const token = authService.getToken()
+    if (!token) {
+      setLoading(false); // No token? Stop loading immediately.
+      return;
+    }
+    
+    const response = await authService.getMe();
+   if (response.success && response.data && Object.keys(response.data).length > 0) {
+  setUser(response.data as User); 
+} else {
+  clearAuthStorage();
+}
+  } catch (err) {
+    clearAuthStorage();
+  } finally {
+    setLoading(false);
+  }
+}, [clearAuthStorage]);
+
+// Trigger refreshUser immediately without waiting for a 'mounted' state variable
+useEffect(() => {
+  refreshUser();
+}, [refreshUser]);
+
+  const refreshAuthToken = useCallback(async () => {
+    if (!mounted || typeof window === 'undefined') return
+
+    try {
+      const response = await authService.refreshToken()
+      if (response.success && response.token) {
+        // refresh user data to ensure sync
+        await refreshUser()
       } else {
         clearAuthStorage()
       }
-    } catch (error) {
-      console.error('Auth check failed:', error)
+    } catch (err) {
+      console.error('Refresh token failed:', err)
       clearAuthStorage()
-    } finally {
-      setLoading(false)
+      throw err
     }
-  }
+  }, [mounted, clearAuthStorage, refreshUser])
 
-  const clearAuthStorage = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('refreshToken')
+const login = useCallback(async (email: string, password: string) => {
+  if (!mounted || typeof window === 'undefined') return
+
+  setLoading(true)
+  try {
+    const response = (await authService.login({ email, password })) as {
+      success: boolean
+      token?: string
+      refreshToken?: string
+      data?: User
     }
-    setUser(null)
-  }
 
-  const login = async (email: string, password: string) => {
+    console.log('Login response:', response)
+
+    if (!response.success) {
+      throw new Error('Login failed')
+    }
+
+    if (response.data) {
+      console.log('Setting user data:', response.data)
+      setUser(response.data)
+
+      // ✅ Navigate after successful login
+      router.push('/dashboard/students') 
+    }
+
+    console.log('Login successful, user state updated')
+  } catch (err: any) {
+    console.error('Login error:', err)
+    throw new Error(err.message || 'Invalid email or password')
+  } finally {
+    setLoading(false)
+  }
+}, [mounted, router])
+
+
+  const register = useCallback(async (data: RegisterData) => {
+    if (!mounted || typeof window === 'undefined') return
+
+    setLoading(true)
     try {
-      setLoading(true)
-      const response: any = await api.auth.login({ email, password })
-
-      if (!response?.success) {
-        throw new Error(response?.message || 'Login failed')
+      const response = (await authService.register(data)) as {
+        success: boolean
+        token?: string
+        refreshToken?: string
+        data?: User
       }
-
-      if (typeof window !== 'undefined') {
-        if (response.token) {
-          localStorage.setItem('authToken', response.token)
-        }
-        if (response.refreshToken) {
-          localStorage.setItem('refreshToken', response.refreshToken)
-        }
+      
+      if (!response.success) {
+        throw new Error('Registration failed')
       }
-
+      
       if (response.data) {
         setUser(response.data)
-      } else if (response.user) {
-        setUser(response.user)
       }
-
-      router.push('/dashboard/students')
-    } catch (error: any) {
-      console.error('Login error:', error)
-      throw new Error(error.message || 'Login failed. Please try again.')
+      
+      // Redirect to dashboard after successful registration
+      router.push('/dashboard')
+    } catch (err: any) {
+      console.error('Registration error:', err)
+      throw new Error(err.message || 'Registration failed')
     } finally {
       setLoading(false)
     }
-  }
+  }, [mounted, router])
 
-  const register = async (data: RegisterData) => {
+  const logout = useCallback(async () => {
+    if (!mounted || typeof window === 'undefined') return
+
     try {
-      setLoading(true)
-      const response: any = await api.auth.register(data)
-
-      if (!response?.success) {
-        throw new Error(response?.message || 'Registration failed')
-      }
-
-      if (typeof window !== 'undefined') {
-        if (response.token) {
-          localStorage.setItem('authToken', response.token)
-        }
-        if (response.refreshToken) {
-          localStorage.setItem('refreshToken', response.refreshToken)
-        }
-      }
-
-      if (response.data) {
-        setUser(response.data)
-      } else if (response.user) {
-        setUser(response.user)
-      }
-
-      router.push('/dashboard/students')
-    } catch (error: any) {
-      console.error('Registration error:', error)
-      throw new Error(error.message || 'Registration failed. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const logout = async () => {
-    try {
-      await api.auth.logout()
-    } catch (error) {
-      console.error('Logout API call failed:', error)
+      await authService.logout()
+    } catch (err) {
+      console.error('Logout API call failed:', err)
     } finally {
       clearAuthStorage()
       router.push('/login')
     }
-  }
+  }, [mounted, clearAuthStorage, router])
 
-  const updateProfile = async (data: any) => {
-    try {
-      const response: any = await api.auth.updateProfile(data)
-      
-      if (response?.success && response?.data) {
-        setUser(prev => prev ? { ...prev, ...response.data } : response.data)
-      } else {
-        throw new Error(response?.message || 'Profile update failed')
-      }
-    } catch (error: any) {
-      console.error('Update profile error:', error)
-      throw new Error(error.message || 'Failed to update profile')
-    }
-  }
+  const updateProfile = useCallback(async (data: any) => {
+    if (!mounted || typeof window === 'undefined') return
 
-  const refreshUser = async () => {
-    try {
-      const response: any = await api.auth.getCurrentUser()
-      
-      if (response?.success && response?.data) {
-        setUser(response.data)
-      } else {
-        clearAuthStorage()
-      }
-    } catch (error) {
-      console.error('Refresh user error:', error)
-      clearAuthStorage()
+    const response = (await authService.updateProfile(data)) as { success: boolean; data?: User }
+    if (response.success && response.data) {
+      setUser(prev => (prev ? { ...prev, ...response.data } : response.data!))
+    } else {
+      throw new Error('Failed to update profile')
     }
-  }
+  }, [mounted])
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    if (!mounted || typeof window === 'undefined') return
+
+    const response = (await authService.changePassword({ currentPassword, newPassword })) as { 
+      success: boolean 
+    }
+    if (!response.success) {
+      throw new Error('Failed to change password')
+    }
+    clearAuthStorage()
+    router.push('/login')
+  }, [mounted, clearAuthStorage, router])
+
+  // Initial user load on mount (client-side only)
+  useEffect(() => {
+    if (mounted) {
+      refreshUser()
+    }
+  }, [mounted, refreshUser])
 
   const value: AuthContextType = {
     user,
@@ -174,17 +201,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     updateProfile,
     refreshUser,
+    changePassword,
+    refreshAuthToken,
     isAuthenticated: !!user,
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export function useAuth() {
+/**
+ * Hook to access AuthContext
+ */
+export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider')

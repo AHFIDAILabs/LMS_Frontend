@@ -35,7 +35,7 @@ export function Navbar() {
               <span className="text-black font-bold text-xl">A</span>
             </div>
             <div>
-              <span className="text-lg font-bold text-white hover:text-[#EFB14A]">AI Accelerator</span>
+              <span className="text-lg font-bold text-white hover:text-[#EFB14A]">AI4SID~Academy</span>
               <span className="text-xs text-gray-500 block hover:text-[#EFB14A]">Innovation Program</span>
             </div>
           </Link>
@@ -43,7 +43,7 @@ export function Navbar() {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-8">
             <Link 
-              href="/program" 
+              href="/allPrograms" 
               className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
             >
               Program
@@ -108,7 +108,7 @@ export function Navbar() {
                       </div>
                       <div className="py-2">
                         <Link
-                          href="/dashboard"
+                          href="/dashboard/students"
                           className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >

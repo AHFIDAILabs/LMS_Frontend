@@ -1,79 +1,243 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/lib/context/AuthContext'
 
+// Security constants
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION = 15 // minutes
+const ATTEMPT_STORAGE_KEY = 'login_attempts'
+const LOCKOUT_STORAGE_KEY = 'account_lockout'
+
+interface LoginAttempt {
+  email: string
+  attempts: number
+  lastAttempt: number
+  lockedUntil?: number
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
+  const [isLocked, setIsLocked] = useState(false)
+  const [remainingTime, setRemainingTime] = useState(0)
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   
   const router = useRouter()
   const { login, loading } = useAuth()
 
+  // Check for account lockout on mount
+  useEffect(() => {
+    checkAccountLockout()
+  }, [])
+
+  // Update remaining time countdown
+  useEffect(() => {
+    if (isLocked && remainingTime > 0) {
+      const timer = setInterval(() => {
+        const lockoutData = getLockoutData()
+        if (lockoutData && lockoutData.lockedUntil) {
+          const remaining = Math.ceil((lockoutData.lockedUntil - Date.now()) / 60000)
+          if (remaining <= 0) {
+            clearLockout()
+            setIsLocked(false)
+            setRemainingTime(0)
+          } else {
+            setRemainingTime(remaining)
+          }
+        }
+      }, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [isLocked, remainingTime])
+
+  const getLockoutData = (): LoginAttempt | null => {
+    if (typeof window === 'undefined') return null
+    const data = localStorage.getItem(LOCKOUT_STORAGE_KEY)
+    return data ? JSON.parse(data) : null
+  }
+
+  const setLockoutData = (data: LoginAttempt) => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(data))
+  }
+
+  const clearLockout = () => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(LOCKOUT_STORAGE_KEY)
+    setIsLocked(false)
+    setRemainingTime(0)
+    setWarning('')
+  }
+
+  const checkAccountLockout = () => {
+    const lockoutData = getLockoutData()
+    if (!lockoutData || !lockoutData.lockedUntil) return
+
+    const now = Date.now()
+    if (lockoutData.lockedUntil > now) {
+      const remaining = Math.ceil((lockoutData.lockedUntil - now) / 60000)
+      setIsLocked(true)
+      setRemainingTime(remaining)
+      setError(`Account temporarily locked. Try again in ${remaining} minutes.`)
+    } else {
+      clearLockout()
+    }
+  }
+
+  const recordFailedAttempt = (userEmail: string) => {
+    const lockoutData = getLockoutData() || {
+      email: userEmail,
+      attempts: 0,
+      lastAttempt: Date.now()
+    }
+
+    lockoutData.attempts += 1
+    lockoutData.lastAttempt = Date.now()
+
+    if (lockoutData.attempts >= MAX_LOGIN_ATTEMPTS) {
+      lockoutData.lockedUntil = Date.now() + (LOCKOUT_DURATION * 60 * 1000)
+      setIsLocked(true)
+      setRemainingTime(LOCKOUT_DURATION)
+      setError(`Too many failed attempts. Account locked for ${LOCKOUT_DURATION} minutes.`)
+    } else {
+      const remaining = MAX_LOGIN_ATTEMPTS - lockoutData.attempts
+      setWarning(`${remaining} attempt${remaining !== 1 ? 's' : ''} remaining before account lockout`)
+    }
+
+    setLockoutData(lockoutData)
+  }
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8
+  }
+
+  const sanitizeInput = (input: string): string => {
+    // Remove potentially dangerous characters
+    return input.trim().replace(/[<>]/g, '')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setWarning('')
+
+    // Check if account is locked
+    if (isLocked) {
+      setError(`Account is locked. Try again in ${remainingTime} minutes.`)
+      return
+    }
+
+    // Sanitize inputs
+    const sanitizedEmail = sanitizeInput(email)
+    const sanitizedPassword = password // Don't sanitize password, just validate length
+
+    // Client-side validation
+    if (!validateEmail(sanitizedEmail)) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    if (!validatePassword(sanitizedPassword)) {
+      setError('Password must be at least 8 characters long')
+      return
+    }
 
     try {
-      await login(email, password)
+      await login(sanitizedEmail, sanitizedPassword)
+      
+      // Clear lockout data on successful login
+      clearLockout()
+      
+      // Handle "Remember Me" functionality (store preference only, not credentials)
+      if (rememberMe && typeof window !== 'undefined') {
+        localStorage.setItem('remember_email', sanitizedEmail)
+      }
+      
       // Navigation is handled in AuthContext
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password')
+      const errorMessage = err.message || 'Invalid email or password'
+      
+      // Record failed attempt
+      recordFailedAttempt(sanitizedEmail)
+      
+      // Check if backend returned lockout warning
+      if (err.warning) {
+        setWarning(err.warning)
+      }
+      
+      setError(errorMessage)
     }
   }
 
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth
+    // TODO: Implement Google OAuth with proper CSRF protection
     console.log('Google login')
   }
 
   const handleGithubLogin = () => {
-    // TODO: Implement GitHub OAuth
+    // TODO: Implement GitHub OAuth with proper CSRF protection
     console.log('GitHub login')
   }
 
+  // Load remembered email on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rememberedEmail = localStorage.getItem('remember_email')
+      if (rememberedEmail) {
+        setEmail(rememberedEmail)
+        setRememberMe(true)
+      }
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-slate-900 flex">
-        
-    {/* Left Side - Welcome Section */}
-<div
-  className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12 overflow-hidden rounded-l-xl"
-  style={{
-    backgroundImage: "url('/images/Dr.Kay3.jpeg')",
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  }}
->
-  {/* Overlay for readability */}
-  <div className="absolute inset-0 bg-black/60" />
+      {/* Left Side - Welcome Section */}
+      <div
+        className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12 overflow-hidden rounded-l-xl"
+        style={{
+          backgroundImage: "url('/images/Dr.Kay3.jpeg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      >
+        {/* Overlay for readability */}
+        <div className="absolute inset-0 bg-black/60" />
 
-  {/* Ambient glows */}
-  <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/10 blur-[140px] rounded-full animate-pulse" />
-  <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 blur-[140px] rounded-full animate-pulse delay-1000" />
+        {/* Ambient glows */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/10 blur-[140px] rounded-full animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 blur-[140px] rounded-full animate-pulse delay-1000" />
 
-  {/* Decorative spheres */}
-  <div className="absolute inset-0 flex items-center justify-center opacity-20">
-    <div className="w-[500px] h-[500px] rounded-full border border-lime-500/20" />
-    <div className="absolute w-[400px] h-[400px] rounded-full border border-lime-500/30" />
-    <div className="absolute w-[300px] h-[300px] rounded-full border border-lime-500/40" />
-  </div>
+        {/* Decorative spheres */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-20">
+          <div className="w-[500px] h-[500px] rounded-full border border-lime-500/20" />
+          <div className="absolute w-[400px] h-[400px] rounded-full border border-lime-500/30" />
+          <div className="absolute w-[300px] h-[300px] rounded-full border border-lime-500/40" />
+        </div>
 
-  <div className="relative z-10 max-w-md text-start">
-    <h1 className="text-5xl font-bold text-white mb-6">
-      Welcome<br />Back
-    </h1>
-    <p className="text-gray-300 text-lg leading-relaxed">
-      Experience the next generation of AI-driven learning. Secure, intelligent, and designed for innovators.
-    </p>
-  </div>
-</div>
-
+        <div className="relative z-10 max-w-md text-start">
+          <h1 className="text-5xl font-bold text-white mb-6">
+            Welcome<br />Back
+          </h1>
+          <p className="text-gray-300 text-lg leading-relaxed">
+            Experience the next generation of AI-driven learning. Secure, intelligent, and designed for innovators.
+          </p>
+        </div>
+      </div>
 
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 relative">
@@ -99,6 +263,21 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Security Notice for Locked Account */}
+          {isLocked && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <div>
+                  <p className="font-semibold mb-1">Account Temporarily Locked</p>
+                  <p className="text-sm">Too many failed login attempts. Please try again in {remainingTime} minute{remainingTime !== 1 ? 's' : ''}.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tabs */}
           <div className="flex space-x-2 mb-8 bg-slate-800/50 p-1 rounded-lg">
             <div className="flex-1 text-center py-2 px-4 bg-slate-700 text-white rounded-lg font-medium cursor-pointer">
@@ -110,25 +289,28 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Address
               </label>
               <Input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
                 required
-                disabled={loading}
+                disabled={loading || isLocked}
+                autoComplete="email"
+                maxLength={100}
                 className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-300">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-300">
                   Password
                 </label>
                 <Link 
@@ -138,17 +320,70 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                disabled={loading}
-                className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  disabled={loading || isLocked}
+                  autoComplete="current-password"
+                  minLength={8}
+                  maxLength={128}
+                  className="bg-slate-800/50 border-gray-700 text-white placeholder:text-gray-500 focus:border-lime-500 focus:ring-lime-500/20 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  disabled={loading || isLocked}
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
+            {/* Remember Me */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <input
+                  id="remember"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading || isLocked}
+                  className="w-4 h-4 rounded border-gray-700 bg-slate-800/50 text-lime-500 focus:ring-lime-500/20"
+                />
+                <label htmlFor="remember" className="text-sm text-gray-400">
+                  Remember my email
+                </label>
+              </div>
+            </div>
+
+            {/* Warning Message */}
+            {warning && !isLocked && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-4 py-3 rounded-lg text-sm">
+                <div className="flex items-start space-x-2">
+                  <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>{warning}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -161,10 +396,10 @@ export default function LoginPage() {
               size="lg"
               fullWidth
               isLoading={loading}
-              disabled={loading}
+              disabled={loading || isLocked}
               className="bg-[#EFB14A] hover:bg-[#EFB14A]/90 text-slate-900 font-semibold"
             >
-              {loading ? 'Signing in...' : 'Sign In →'}
+              {loading ? 'Signing in...' : isLocked ? 'Account Locked' : 'Sign In →'}
             </Button>
           </form>
 
@@ -179,7 +414,7 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-4">
             <button
               onClick={handleGoogleLogin}
-              disabled={loading}
+              disabled={loading || isLocked}
               className="flex items-center justify-center space-x-2 bg-slate-800/50 border border-gray-700 hover:border-gray-600 text-white py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -193,7 +428,7 @@ export default function LoginPage() {
             
             <button
               onClick={handleGithubLogin}
-              disabled={loading}
+              disabled={loading || isLocked}
               className="flex items-center justify-center space-x-2 bg-slate-800/50 border border-gray-700 hover:border-gray-600 text-white py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

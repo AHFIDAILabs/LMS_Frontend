@@ -1,6 +1,6 @@
 // ============= USER & AUTH =============
 export interface User {
-  id: string
+  _id: string
   firstName: string
   lastName: string
   email: string
@@ -40,6 +40,7 @@ export interface RegisterData {
 export interface Course {
   _id: string
   title: string
+  slug: string // For URL
   description: string
   instructor: string
   duration: string // e.g., "8 weeks"
@@ -240,11 +241,14 @@ export interface Activity {
 }
 
 // ============= API RESPONSES =============
+// types/api.ts
 export interface ApiResponse<T> {
-  success: boolean
-  data: T
-  message?: string
+  success: boolean;
+  data: T | null;
+  error?: string;
+  message?: string;
 }
+
 
 export interface PaginatedResponse<T> {
   success: boolean
@@ -262,3 +266,65 @@ export interface ApiError {
   message: string
   errors?: Record<string, string[]>
 }
+
+
+
+export type Instructor = {
+  id: string
+  name: string
+  avatar: string
+  title?: string
+  bio?: string
+  qualifications?: string[]
+  rating?: number
+  reviews?: number
+  experience?: number
+  socials?: { linkedin?: string; twitter?: string; github?: string }
+  role?: "instructor"
+  isVerified?: boolean
+}
+
+
+
+export interface Program {
+  _id: string;
+  title: string;
+  slug: string;
+  description: string;
+  category?: string;
+  tags?: string[];
+  courses: Course[];
+  order: number;
+  estimatedHours?: number;
+  instructors: Instructor[];
+  coverImage?: string;
+  bannerImage?: string;
+  price?: number;
+  currency?: string;
+  enrollmentLimit?: number;
+  isPublished: boolean;
+  startDate?: string;
+  endDate?: string;
+  isSelfPaced?: boolean;
+  certificateTemplate?: string;
+   approvalStatus: 'pending' | 'approved' | 'rejected';
+  prerequisites?: string[];
+  targetAudience?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgramPayload {
+  title: string
+  description: string
+  category?: string
+  tags?: string[]
+  instructors?: string[]
+  price?: number
+  currency?: string
+  prerequisites?: string[]
+  targetAudience?: string
+}
+
+
+// ============= END OF FILE =============

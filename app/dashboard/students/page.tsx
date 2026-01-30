@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useCourses } from '@/hooks/useCourses'
 import {
   Card,
   CardHeader,
@@ -15,13 +15,16 @@ import {
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CircularProgress } from '@/components/ui/ProgressBar'
+import { Avatar } from '@/components/ui/Avatar'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar'
-import api from '@/lib/api'
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const { getMyCourses, loading: coursesLoading } = useCourses()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
+  
+  const [courses, setCourses] = useState<any[]>([])
+  const [overallProgress, setOverallProgress] = useState(0)
 
   useEffect(() => {
     if (authLoading) return
@@ -30,23 +33,28 @@ export default function DashboardPage() {
       return
     }
 
-    const load = async () => {
+    const loadData = async () => {
       try {
-        await Promise.all([
-          api.courses.getAll(),
-          api.progress.getOverview(),
-        ])
+        const coursesData = await getMyCourses()
+        console.log('Courses data:', coursesData)
+        setCourses(coursesData || [])
+        
+        // Calculate overall progress
+        if (coursesData && coursesData.length > 0) {
+          const totalProgress = coursesData.reduce((sum: number, course: any) => {
+            return sum + (course.progress?.overallProgress || 0)
+          }, 0)
+          setOverallProgress(Math.round(totalProgress / coursesData.length))
+        }
       } catch (err) {
-        console.error('Dashboard load failed:', err)
-      } finally {
-        setLoading(false)
+        console.error('Failed to load dashboard data:', err)
       }
     }
 
-    load()
-  }, [authLoading, isAuthenticated, router])
+    loadData()
+  }, [authLoading, isAuthenticated, router, getMyCourses])
 
-  if (authLoading || loading) {
+  if (authLoading || coursesLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -59,34 +67,16 @@ export default function DashboardPage() {
 
   if (!isAuthenticated) return null
 
-  /* ---------- Mock Data (Replace Later) ---------- */
-
-  const enrolledCourses = [
-    { id: 1, title: 'Neural Networks', module: 'Introduction', progress: 75, status: 'in-progress', nextLesson: 'Backpropagation' },
-    { id: 2, title: 'Python for ML', module: 'Pandas Basics', progress: 45, status: 'in-progress', nextLesson: 'Data Cleaning' },
-    { id: 3, title: 'AI Fundamentals', module: 'Week 8', progress: 100, status: 'completed' },
-  ]
-
-  const upcomingLessons = [
-    { id: 1, title: 'Deep Learning Basics', course: 'Neural Networks', date: 'Jan 22', time: '10:00 AM' },
-    { id: 2, title: 'Data Ethics & Privacy', course: 'AI Ethics', date: 'Jan 24', time: '2:00 PM' },
-  ]
-
-  const achievements = [
-    { id: 1, title: 'Fast Learner', description: 'Completed 5 lessons in a day', icon: '⚡', earned: true },
-    { id: 2, title: 'Quiz Master', description: '100% on 3 quizzes', icon: '🎯', earned: true },
-    { id: 3, title: 'Consistency King', description: '7-day streak', icon: '🔥', earned: false },
-  ]
-
-  const recentActivity = [
-    { id: 1, type: 'lesson', title: 'Completed: Intro to CNNs', offer: '2 hours ago' },
-    { id: 2, type: 'quiz', title: '95% on Module 3 Quiz', offer: '1 day ago' },
-    { id: 3, type: 'certificate', title: 'AI Fundamentals Certificate', offer: '3 days ago' },
-  ]
-
-  const overallProgress = 65
-
-  /* ---------- Layout ---------- */
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'success'
+      case 'active':
+        return 'primary'
+      default:
+        return 'neutral'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex">
@@ -102,12 +92,14 @@ export default function DashboardPage() {
             </div>
 
             <Link href="/profile" className="flex items-center gap-3 hover:bg-slate-700 p-2 rounded-lg transition">
-              <Image
-                src={user?.profileImage || '/default-avatar.png'}
-                alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full"
+              <Avatar
+                src={user?.profileImage}
+                firstName={user?.firstName}
+                lastName={user?.lastName}
+                userId={user?._id}
+                size="sm"
+                showOnlineStatus
+                isOnline
               />
               <span className="text-white text-sm font-medium hidden md:block">
                 {user?.firstName}
@@ -119,7 +111,7 @@ export default function DashboardPage() {
         {/* Content */}
         <main className="container-custom py-8 space-y-8">
           {/* Welcome */}
-          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
+          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-0 right-0 w-96 h-96 bg-lime-500/10 blur-[140px]" />
             </div>
@@ -127,10 +119,12 @@ export default function DashboardPage() {
             <div className="relative flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-bold text-white mb-2">
-                  Keep going 🚀
+                  Keep going 
                 </h2>
                 <p className="text-gray-400 text-lg">
-                  You’re ahead of most learners. No cap.
+                  {courses.length > 0 
+                    ? "You're making great progress!"
+                    : "Start your learning journey today"}
                 </p>
               </div>
               <CircularProgress value={overallProgress} size={120} />
@@ -151,72 +145,97 @@ export default function DashboardPage() {
                   </Link>
                 </header>
 
-                <div className="space-y-4">
-                  {enrolledCourses.map(course => (
-                    <Card key={course.id}>
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex justify-between">
-                          <div>
-                            <h4 className="text-lg font-semibold text-white">
-                              {course.title}
-                            </h4>
-                            <p className="text-sm text-gray-400">
-                              {course.module}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-white">
-                              {course.progress}%
-                            </div>
-                            <Badge variant={course.status === 'completed' ? 'success' : 'primary'}>
-                              {course.status}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-lime-500 to-emerald-500"
-                            style={{ width: `${course.progress}%` }}
-                          />
-                        </div>
-
-                        <Button size="sm" className="bg-[#EFB14A] hover:bg-[#EFB14A]/90">
-                          Continue
+                {courses.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <div className="mb-4 text-gray-500">
+                        <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <h4 className="text-lg font-semibold text-white mb-2">No courses yet</h4>
+                      <p className="text-gray-400 mb-4">Enroll in a program to start learning</p>
+                      <Link href="/allPrograms">
+                        <Button className="bg-[#EFB14A] hover:bg-[#EFB14A]/90">
+                          Browse Programs
                         </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {courses.map((courseData: any, index: number) => {
+                      const course = courseData.course
+                      const progress = courseData.progress?.overallProgress || 0
+                      const status = courseData.enrollmentStatus || 'pending'
+                      
+                      return (
+                        <Card key={course?._id || index}>
+                          <CardContent className="p-6 space-y-4">
+                            <div className="flex justify-between">
+                              <div>
+                                <h4 className="text-lg font-semibold text-white">
+                                  {course?.title || 'Untitled Course'}
+                                </h4>
+                                <p className="text-sm text-gray-400">
+                                  {courseData.lessonsCompleted || 0} / {courseData.totalLessons || 0} lessons completed
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-white">
+                                  {progress}%
+                                </div>
+                                <Badge variant={getStatusBadge(status)}>
+                                  {status}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-linear-to-r from-lime-500 to-emerald-500 transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+
+                            <Link href={`/courses/${course?._id}`}>
+                              <Button size="sm" className="bg-[#EFB14A] hover:bg-[#EFB14A]/90">
+                                {status === 'completed' ? 'Review Course' : 'Continue'}
+                              </Button>
+                            </Link>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
               </section>
             </div>
 
-            {/* Right */}
+            {/* Right Sidebar */}
             <aside className="space-y-8">
               <Card>
                 <CardHeader>
-                  <CardTitle>Achievements</CardTitle>
-                  <CardDescription>Milestones unlocked</CardDescription>
+                  <CardTitle>Quick Stats</CardTitle>
+                  <CardDescription>Your learning overview</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {achievements.map(a => (
-                    <div
-                      key={a.id}
-                      className={`p-3 rounded-lg border ${
-                        a.earned
-                          ? 'border-lime-500/30 bg-lime-500/10'
-                          : 'border-gray-700 bg-slate-800/50 opacity-50'
-                      }`}
-                    >
-                      <div className="flex gap-3">
-                        <span className="text-2xl">{a.icon}</span>
-                        <div>
-                          <p className="text-white font-medium">{a.title}</p>
-                          <p className="text-xs text-gray-400">{a.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
+                    <span className="text-gray-400">Total Courses</span>
+                    <span className="text-2xl font-bold text-white">{courses.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
+                    <span className="text-gray-400">Completed</span>
+                    <span className="text-2xl font-bold text-lime-500">
+                      {courses.filter((c: any) => c.enrollmentStatus === 'completed').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
+                    <span className="text-gray-400">In Progress</span>
+                    <span className="text-2xl font-bold text-yellow-500">
+                      {courses.filter((c: any) => c.enrollmentStatus === 'active').length}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </aside>

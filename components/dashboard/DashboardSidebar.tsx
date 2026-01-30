@@ -10,22 +10,24 @@ const navItems = [
   { label: 'Assignments', href: '/assignments', icon: '📝' },
   { label: 'Certificates', href: '/certificates', icon: '🎓' },
   { label: 'Community', href: '/community', icon: '💬' },
+  { label: 'Settings', href: '/settings', icon: '⚙️' },
+  { label: 'Logout', href: '/login', icon: '🚪' },
 ]
 
 export default function DashboardSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-slate-950 border-r border-gray-800 flex flex-col">
+    <aside className="fixed inset-y-0 left-0 w-64 py-2.5 bg-slate-950 border-r border-gray-800 flex flex-col">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-800">
+      <Link href={'/'} className="h-16 flex items-center px-6 border-b border-gray-800">
         <div className="w-9 h-9 rounded-lg bg-linear-to-br from-lime-500 to-emerald-500 flex items-center justify-center">
           <span className="font-bold text-slate-900">A</span>
         </div>
         <span className="ml-3 text-white font-semibold text-lg">
-          AIxcel
+          AI4SID~Academy
         </span>
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-6 space-y-1">
