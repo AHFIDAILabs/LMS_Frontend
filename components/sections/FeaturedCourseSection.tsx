@@ -8,11 +8,13 @@ import { useEffect, useState } from 'react'
 import { Course } from '@/types'
 
 interface FeaturedCoursesProps {
+  propCourses: Course[]
   title?: string
   subtitle?: string
 }
 
 export const FeaturedCourses = ({
+  propCourses,
   title = "Featured Courses",
   subtitle = "Hand-picked courses to accelerate your learning journey"
 }: FeaturedCoursesProps) => {
