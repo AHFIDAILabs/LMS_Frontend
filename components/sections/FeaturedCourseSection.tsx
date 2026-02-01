@@ -24,12 +24,14 @@ interface Course {
 }
 
 interface FeaturedCoursesProps {
+ 
   title?: string
   subtitle?: string
   limit?: number
 }
 
 export const FeaturedCourses = ({
+
   title = "Featured Courses",
   subtitle = "Hand-picked courses to accelerate your learning journey",
   limit = 4

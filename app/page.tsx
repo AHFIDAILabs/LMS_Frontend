@@ -65,13 +65,12 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Featured Courses Section */}
+     {/* Featured Courses Section */}
       {featuredCourses.length > 0 && (
-        <FeaturedCourses 
-          propCourses={featuredCourses}
-          title="Featured Courses"
-          subtitle="Popular courses across all our programs to jumpstart your learning"
-        />
+      <FeaturedCourses 
+  title="Featured Courses"
+  subtitle="Popular courses across all our programs to jumpstart your learning"
+/> 
       )}
 
       {/* How It Works */}
