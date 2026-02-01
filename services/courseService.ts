@@ -23,6 +23,7 @@ export const courseService = {
   },
 
   getCourseById: async (courseId: string) => {
+    // Fixed: Added opening parenthesis
     const response = await fetch(`${API_URL}/courses/${courseId}`);
     return handleResponse(response);
   },
@@ -30,12 +31,12 @@ export const courseService = {
   // =====================================================
   // STUDENT
   // =====================================================
- getMyCourses: async () => {
-  const response = await fetchWithAuth(`${API_URL}/courses/student/my-courses`, {
-    credentials: 'include', // Add this
-  });
-  return handleResponse(response);
-},
+  getMyCourses: async () => {
+    const response = await fetchWithAuth(`${API_URL}/courses/student/my-courses`, {
+      credentials: 'include',
+    });
+    return handleResponse(response);
+  },
 
   enrollInCourse: async (courseId: string) => {
     const response = await fetchWithAuth(`${API_URL}/courses/${courseId}/enroll`, {

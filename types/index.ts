@@ -36,32 +36,202 @@ export interface RegisterData {
   cohort?: string
 }
 
-// ============= COURSE =============
+// ============= COURSE TYPES (UPDATED) =============
+
 export interface Course {
   _id: string
   title: string
-  slug: string // For URL
+  slug: string
   description: string
-  instructor: string
-  duration: string // e.g., "8 weeks"
-  level: 'beginner' | 'intermediate' | 'advanced'
-  thumbnail?: string
-  modules: Module[]
-  totalLessons: number
-  totalDuration: number // in minutes
-  enrolledStudents: number
+  coverImage?: string
+  estimatedHours: number
+  
+  objectives: string[]
+  prerequisites: string[]
+  targetAudience: string
+  
+  program: {
+    _id: string
+    title: string
+    slug: string
+    description?: string
+  }
+  
+  order: number
   isPublished: boolean
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+  
+  completionCriteria: {
+    minimumQuizScore: number
+    requiredProjects: number
+    capstoneRequired: boolean
+  }
+  
+  currentEnrollment?: number
+  
+  createdBy: {
+    _id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  
   createdAt: string
   updatedAt: string
 }
 
-export interface CourseCreate {
+export interface CourseDetailResponse {
+  course: Course
+  modules: CourseModule[]
+  stats: {
+    totalModules: number
+    totalLessons: number
+    totalAssessments: number
+  }
+}
+
+export interface CourseModule {
+  _id: string
+  course: string
   title: string
   description: string
-  instructor: string
-  duration: string
-  level: 'beginner' | 'intermediate' | 'advanced'
-  thumbnail?: string
+  order: number
+  isPublished: boolean
+  lessons?: Lesson[]
+  assessments?: Assessment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Assessment {
+  _id: string
+  courseId: string
+  moduleId?: string
+  title: string
+  description: string
+  type: 'quiz' | 'assignment' | 'project'
+  order: number
+  isPublished: boolean
+  questions?: Question[]
+  passingScore?: number
+  timeLimit?: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Attachment {
+  name: string
+  url: string
+  type: string
+  size: number
+}
+
+
+export interface Question {
+  _id: string
+  question: string
+  type: 'multiple-choice' | 'true-false' | 'short-answer'
+  options?: string[] // for multiple choice
+  correctAnswer: string | number
+  explanation?: string
+  points: number
+}
+
+export interface EnrolledCourse {
+  course: Course
+  enrollmentStatus: 'active' | 'completed' | 'dropped'
+  lessonsCompleted: number
+  totalLessons: number
+  completionDate?: string
+  progress?: Progress | undefined
+}
+
+export interface AssessmentAttempt {
+  assessmentId: string
+  score: number
+  passed: boolean
+  attemptNumber: number
+  submittedAt: string
+}
+
+export interface CourseStats {
+  enrollments: {
+    total: number
+    active: number
+    completed: number
+    completionRate: number
+  }
+  progress: {
+    averageProgress: number
+    averageScore: number
+  }
+  content: {
+    modules: number
+    lessons: number
+    assessments: number
+  }
+  currentEnrollment: number
+}
+
+export interface CourseCreatePayload {
+  program: string
+  order?: number
+  title: string
+  slug: string
+  description: string
+  estimatedHours?: number
+  objectives?: string[]
+  prerequisites?: string[]
+  targetAudience: string
+  coverImage?: File | string
+  completionCriteria?: {
+    minimumQuizScore: number
+    requiredProjects: number
+    capstoneRequired: boolean
+  }
+}
+
+export interface CourseUpdatePayload {
+  order?: number
+  title?: string
+  slug?: string
+  description?: string
+  estimatedHours?: number
+  objectives?: string[]
+  prerequisites?: string[]
+  targetAudience?: string
+  coverImage?: File | string
+  isPublished?: boolean
+  completionCriteria?: {
+    minimumQuizScore: number
+    requiredProjects: number
+    capstoneRequired: boolean
+  }
+}
+
+export interface CoursesListResponse {
+  success: boolean
+  count: number
+  total: number
+  page: number
+  pages: number
+  data: Course[]
+}
+
+export interface CourseContentResponse {
+  success: boolean
+  data: {
+    course: Course
+    modules: CourseModule[]
+    courseAssessments: Assessment[]
+    stats: {
+      totalModules: number
+      totalLessons: number
+      totalAssessments: number
+      publishedModules: number
+      publishedLessons: number
+    }
+  }
 }
 
 // ============= MODULE =============
@@ -91,6 +261,7 @@ export interface Lesson {
   content: string // Markdown or HTML content
   videoUrl?: string
   duration: number // in minutes
+   isPublished: boolean
   order: number
   attachments?: Attachment[]
   createdAt: string
@@ -105,13 +276,6 @@ export interface LessonCreate {
   order: number
 }
 
-export interface Attachment {
-  name: string
-  url: string
-  type: string
-  size: number
-}
-
 // ============= QUIZ =============
 export interface Quiz {
   _id: string
@@ -124,16 +288,6 @@ export interface Quiz {
   attempts: number // max attempts allowed
   createdAt: string
   updatedAt: string
-}
-
-export interface Question {
-  _id: string
-  question: string
-  type: 'multiple-choice' | 'true-false' | 'short-answer'
-  options?: string[] // for multiple choice
-  correctAnswer: string | number
-  explanation?: string
-  points: number
 }
 
 export interface QuizSubmission {
@@ -155,9 +309,11 @@ export interface QuizResult {
 export interface Progress {
   _id: string
   userId: string
+    studentId: string
   courseId: string
   completedLessons: string[]
   completedQuizzes: QuizAttempt[]
+  completedAssessments: AssessmentAttempt[]
   overallProgress: number // percentage
   lastAccessedAt: string
   startedAt: string
@@ -206,13 +362,13 @@ export interface Enrollment {
   userName: string
   courseName: string
   enrolledAt: string
-  progress: number
+  progress: Progress
 }
 
 export interface CourseStats {
   courseId: string
   courseName: string
-  enrollments: number
+  enrollments: { total: number; active: number; completed: number; completionRate: number; }
   completions: number
   averageScore: number
   completionRate: number
@@ -225,13 +381,6 @@ export interface StudentDashboard {
   upcomingQuizzes: Quiz[]
   certificates: Certificate[]
 }
-
-export interface EnrolledCourse {
-  course: Course
-  progress: Progress
-  nextLesson?: Lesson
-}
-
 export interface Activity {
   _id: string
   type: 'lesson-completed' | 'quiz-attempted' | 'course-enrolled' | 'certificate-earned'
