@@ -8,8 +8,8 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI Accelerator - Master Artificial Intelligence',
-  description: 'Transform your career with our intensive 8-week AI and Machine Learning program',
+  title: 'AI4SID~Academy- Master Artificial Intelligence',
+  description: 'Transform your career with our intensive  AI and Machine Learning programs',
 }
 
 export default function RootLayout({
