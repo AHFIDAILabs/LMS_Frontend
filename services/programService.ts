@@ -1,10 +1,10 @@
 // ============================================
 // services/programService.ts
 // ============================================
-
 import { ApiResponse } from '@/types';
 import { getAuthToken, handleResponse } from '../lib/utils';
 import { Program, ProgramPayload } from '@/types';
+import { axiosClient } from '@/lib/axiosClient'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -37,31 +37,33 @@ export const programService = {
   // ---------------------------------------------------
   // GET: all programs
   // ---------------------------------------------------
-  getPrograms: async (params?: {
-    page?: number;
-    limit?: number;
-    isPublished?: boolean;
-    instructorId?: string;
-    category?: string;
-    tags?: string[];
-  }): Promise<ApiResponse<Program[]>> => {
-    try {
-      const queryParams = new URLSearchParams();
-      if (params) {
-        if (params.page) queryParams.append('page', params.page.toString());
-        if (params.limit) queryParams.append('limit', params.limit.toString());
-        if (params.isPublished !== undefined) queryParams.append('isPublished', params.isPublished.toString());
-        if (params.instructorId) queryParams.append('instructorId', params.instructorId);
-        if (params.category) queryParams.append('category', params.category);
-        if (params.tags?.length) params.tags.forEach(tag => queryParams.append('tags[]', tag));
-      }
-      const url = `${API_URL}/programs${queryParams.toString() ? `?${queryParams}` : ''}`;
-      const response = await fetchPrograms(url);
-      return handleResponse<Program[]>(response);
-    } catch (error: any) {
-      return { success: false, error: error.message || 'Failed to fetch programs', data: null as any };
+ getPrograms: async (params?: {
+  page?: number
+  limit?: number
+  isPublished?: boolean
+  instructorId?: string
+  category?: string
+  tags?: string[]
+}): Promise<ApiResponse<Program[]>> => {
+  try {
+    const response = await axiosClient.get('/programs', { params })
+
+    return {
+      success: true,
+      data: response.data.data,
+      total: response.data.total,
+      page: response.data.page,
+      pages: response.data.pages,
+      error: undefined,
     }
-  },
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message || 'Failed to fetch programs',
+      data: [],
+    }
+  }
+},
 
   // ---------------------------------------------------
   // GET: program by ID

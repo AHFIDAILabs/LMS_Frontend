@@ -1,18 +1,24 @@
 
 // services/adminService.ts
 import { fetchWithAuth, handleResponse } from '../lib/utils'; // assuming you move your helper functions to a utils file
-
+import {GetAllUsersResponse} from '@/types';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'
 
 export const adminService = {
+
+
+  // ============================
+  // ADMIN  CREATE PROGRAM
+// ============================
+
   // =============================
   // USER MANAGEMENT (Admin Only)
   // =============================
-getAllUsers: async (params?: Record<string, string | number>) => {
-  const query = params ? `?${new URLSearchParams(params as any)}` : '';
-  const response = await fetchWithAuth(`${API_URL}/admin/users${query}`);
-  return handleResponse(response);
-},
+  getAllUsers: async (params?: Record<string, string | number>) => {
+    const query = params ? `?${new URLSearchParams(params as any)}` : '';
+    const response = await fetchWithAuth(`${API_URL}/admin/users${query}`);
+    return handleResponse<GetAllUsersResponse>(response);
+  },
 
   getUserById: async (userId: string) => {
     const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}`);
@@ -71,12 +77,13 @@ getAllUsers: async (params?: Record<string, string | number>) => {
     return handleResponse(response);
   },
 
-  promoteToInstructor: async (userId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote-instructor`, {
-      method: 'PATCH',
-    });
-    return handleResponse(response);
-  },
+promoteToInstructor: async (userId: string, programId?: string) => {
+  const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote-instructor`, {
+    method: 'PATCH',
+    body: JSON.stringify({ programId }),
+  });
+  return handleResponse(response);
+},
 
   demoteToStudent: async (userId: string) => {
     const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/demote-instructor`, {

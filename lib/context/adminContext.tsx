@@ -1,4 +1,4 @@
-// context/AdminContext.tsx
+'use client';
 import { createContext, useContext, ReactNode } from 'react';
 import { useDashboardStats, useUsers } from '../../hooks/useAdmin';
 
@@ -10,8 +10,9 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export const AdminProvider = ({ children }: { children: ReactNode }) => {
+  // ✅ Use hooks
   const dashboardStats = useDashboardStats();
-  const users = useUsers();
+  const users = useUsers(); // This now returns { data, loading, error, pagination, refetch }
 
   return (
     <AdminContext.Provider value={{ dashboardStats, users }}>

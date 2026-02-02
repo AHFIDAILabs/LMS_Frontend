@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { authService } from '@/services/authService'
 import { User, RegisterData } from '@/types/user'
@@ -23,175 +23,211 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const isLoggingInRef = useRef(false)
+
   const router = useRouter()
 
-  // Track if component is mounted (client-side only)
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const getDashboardRoute = (role: string) => {
+  switch (role) {
+    case 'student':
+      return '/dashboard/students'
+    case 'admin':
+      return '/dashboard/admin'
+    case 'instructor':
+      return '/dashboard/instructor'
+    default:
+      return '/'
+  }
+}
+
 
   const clearAuthStorage = useCallback(() => {
     authService.clearTokens()
     setUser(null)
   }, [])
 
-const refreshUser = useCallback(async () => {
-  // 1. If we are on the server, we can't check localStorage/cookies easily here
-  if (typeof window === 'undefined') return;
-
-  try {
-    const token = authService.getToken()
-    if (!token) {
-      setLoading(false); // No token? Stop loading immediately.
-      return;
-    }
-    
-    const response = await authService.getMe();
-   if (response.success && response.data && Object.keys(response.data).length > 0) {
-  setUser(response.data as User); 
-} else {
-  clearAuthStorage();
-}
-  } catch (err) {
-    clearAuthStorage();
-  } finally {
-    setLoading(false);
-  }
-}, [clearAuthStorage]);
-
-// Trigger refreshUser immediately without waiting for a 'mounted' state variable
-useEffect(() => {
-  refreshUser();
-}, [refreshUser]);
-
-  const refreshAuthToken = useCallback(async () => {
-    if (!mounted || typeof window === 'undefined') return
+  const refreshUser = useCallback(async () => {
+    if (typeof window === 'undefined') return
 
     try {
+      const token = authService.getToken()
+      
+     if (!token) {
+  if (isLoggingInRef.current) {
+    console.log('⏳ Skipping refreshUser during login')
+    return
+  }
+
+  console.log('📭 No auth token found')
+  setUser(null)
+  setLoading(false)
+  return
+}
+
+
+      console.log('🔄 Refreshing user data...')
+      const response = await authService.getMe()
+      
+      console.log('📦 getMe response:', response)
+      
+      if (response.success && response.data && Object.keys(response.data).length > 0) {
+        console.log('✅ User authenticated:', response.data)
+        setUser(response.data as User)
+      } else {
+        console.log('❌ Invalid user data, clearing auth')
+        clearAuthStorage()
+      }
+    } catch (err: any) {
+      console.error('❌ Error refreshing user:', err.message)
+      if (err.message?.includes('401') || err.message?.includes('Unauthorized') || err.message?.includes('Not authorized')) {
+        clearAuthStorage()
+      }
+    } finally {
+      setLoading(false)
+      setIsInitialized(true)
+    }
+  }, [clearAuthStorage])
+
+  useEffect(() => {
+    if (!isInitialized) {
+      console.log('🚀 Initializing authentication...')
+      refreshUser()
+    }
+  }, [])
+
+  const refreshAuthToken = useCallback(async () => {
+    if (typeof window === 'undefined') return
+
+    try {
+      console.log('🔄 Refreshing auth token...')
       const response = await authService.refreshToken()
+      
       if (response.success && response.token) {
-        // refresh user data to ensure sync
+        console.log('✅ Token refreshed successfully')
         await refreshUser()
       } else {
+        console.log('❌ Token refresh failed')
         clearAuthStorage()
       }
     } catch (err) {
-      console.error('Refresh token failed:', err)
+      console.error('❌ Refresh token failed:', err)
       clearAuthStorage()
       throw err
     }
-  }, [mounted, clearAuthStorage, refreshUser])
+  }, [clearAuthStorage, refreshUser])
+
 
 const login = useCallback(async (email: string, password: string) => {
-  if (!mounted || typeof window === 'undefined') return
-
   setLoading(true)
+  isLoggingInRef.current = true
+
   try {
-    const response = (await authService.login({ email, password })) as {
-      success: boolean
-      token?: string
-      refreshToken?: string
-      data?: User
+    const response = await authService.login({ email, password })
+
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Login failed')
     }
 
-    console.log('Login response:', response)
+    const loggedInUser = response.data as User
+    setUser(loggedInUser)
 
-    if (!response.success) {
-      throw new Error('Login failed')
-    }
+    // ✅ ROLE-BASED NAVIGATION HERE
+    const route = getDashboardRoute(loggedInUser.role)
+    router.replace(route)
 
-    if (response.data) {
-      console.log('Setting user data:', response.data)
-      setUser(response.data)
-
-      // ✅ Navigate after successful login
-      router.push('/dashboard/students') 
-    }
-
-    console.log('Login successful, user state updated')
-  } catch (err: any) {
-    console.error('Login error:', err)
-    throw new Error(err.message || 'Invalid email or password')
   } finally {
+    isLoggingInRef.current = false
     setLoading(false)
   }
-}, [mounted, router])
+}, [])
+
 
 
   const register = useCallback(async (data: RegisterData) => {
-    if (!mounted || typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
     setLoading(true)
     try {
-      const response = (await authService.register(data)) as {
-        success: boolean
-        token?: string
-        refreshToken?: string
-        data?: User
-      }
+      console.log('📝 Registering user...')
       
+      const response = await authService.register(data)
+
+      console.log('📦 Registration response:', response)
+
       if (!response.success) {
-        throw new Error('Registration failed')
+        throw new Error(response.error || 'Registration failed')
       }
-      
-      if (response.data) {
-        setUser(response.data)
+
+      if (!response.data) {
+        throw new Error('No user data received')
       }
-      
-      // Redirect to dashboard after successful registration
-      router.push('/dashboard')
+
+      const userData = response.data as User
+      console.log('✅ Registration successful:', userData)
+      setUser(userData)
+
+
     } catch (err: any) {
-      console.error('Registration error:', err)
-      throw new Error(err.message || 'Registration failed')
-    } finally {
+      console.error('❌ Registration error:', err)
       setLoading(false)
+      throw new Error(err.message || 'Registration failed')
     }
-  }, [mounted, router])
+  }, [])
 
   const logout = useCallback(async () => {
-    if (!mounted || typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
+    console.log('👋 Logging out...')
+    
     try {
       await authService.logout()
     } catch (err) {
-      console.error('Logout API call failed:', err)
+      console.error('❌ Logout API call failed:', err)
     } finally {
       clearAuthStorage()
-      router.push('/login')
+      setUser(null)
+      window.location.href = '/auth/login'
     }
-  }, [mounted, clearAuthStorage, router])
+  }, [clearAuthStorage])
 
   const updateProfile = useCallback(async (data: any) => {
-    if (!mounted || typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
-    const response = (await authService.updateProfile(data)) as { success: boolean; data?: User }
+    const response = await authService.updateProfile(data)
+    
     if (response.success && response.data) {
-      setUser(prev => (prev ? { ...prev, ...response.data } : response.data!))
+      setUser(prev => (prev ? { ...prev, ...response.data } : response.data as User))
     } else {
       throw new Error('Failed to update profile')
     }
-  }, [mounted])
+  }, [])
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
-    if (!mounted || typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
-    const response = (await authService.changePassword({ currentPassword, newPassword })) as { 
-      success: boolean 
-    }
+    const response = await authService.changePassword({ currentPassword, newPassword })
+    
     if (!response.success) {
       throw new Error('Failed to change password')
     }
+    
     clearAuthStorage()
-    router.push('/login')
-  }, [mounted, clearAuthStorage, router])
+    window.location.href = '/auth/login'
+  }, [clearAuthStorage])
 
-  // Initial user load on mount (client-side only)
   useEffect(() => {
-    if (mounted) {
-      refreshUser()
-    }
-  }, [mounted, refreshUser])
+    if (!user || !isInitialized) return
+
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing token...')
+      refreshAuthToken().catch(err => {
+        console.error('Auto refresh failed:', err)
+      })
+    }, 14 * 60 * 1000)
+
+    return () => clearInterval(refreshInterval)
+  }, [user, isInitialized, refreshAuthToken])
 
   const value: AuthContextType = {
     user,
@@ -209,9 +245,6 @@ const login = useCallback(async (email: string, password: string) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-/**
- * Hook to access AuthContext
- */
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {

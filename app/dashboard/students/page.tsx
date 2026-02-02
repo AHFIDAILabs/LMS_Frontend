@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CircularProgress } from '@/components/ui/ProgressBar'
 import { Avatar } from '@/components/ui/Avatar'
-import DashboardSidebar from '@/components/dashboard/DashboardSidebar'
+import StudentSidebar from '@/components/dashboard/StudentSidebar'
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
@@ -26,34 +26,44 @@ export default function DashboardPage() {
   const [courses, setCourses] = useState<any[]>([])
   const [overallProgress, setOverallProgress] = useState(0)
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!isAuthenticated) {
-      router.replace('/auth/login')
-      return
-    }
+ useEffect(() => {
+  if (authLoading) return
+  if (!isAuthenticated || !user) {
+    router.replace('/auth/login')
+    return
+  }
 
-    const loadData = async () => {
-      try {
-        const coursesData = await getMyCourses()
-        console.log('Courses data:', coursesData)
-        setCourses(coursesData || [])
-        
-        // Calculate overall progress
-        if (coursesData && coursesData.length > 0) {
-          const totalProgress = coursesData.reduce((sum: number, course: any) => {
-            return sum + (course.progress?.overallProgress || 0)
-          }, 0)
-          setOverallProgress(Math.round(totalProgress / coursesData.length))
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err)
+  // Instructor without a program can't use any dashboard
+  if (user.role === 'instructor' && !user.programId) {
+    router.replace('/')
+    return
+  }
+
+  // This IS the student dashboard — only students belong here
+  if (user.role !== 'student') {
+    router.replace('/')
+    return
+  }
+
+  const loadData = async () => {
+    try {
+      const coursesData = await getMyCourses()
+      console.log('Courses data:', coursesData)
+      setCourses(coursesData || [])
+
+      if (coursesData && coursesData.length > 0) {
+        const totalProgress = coursesData.reduce((sum: number, course: any) => {
+          return sum + (course.progress?.overallProgress || 0)
+        }, 0)
+        setOverallProgress(Math.round(totalProgress / coursesData.length))
       }
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err)
     }
+  }
 
-    loadData()
-  }, [authLoading, isAuthenticated, router, getMyCourses])
-
+  loadData()
+}, [authLoading, isAuthenticated, user, router, getMyCourses])
   if (authLoading || coursesLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -80,7 +90,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex">
-      <DashboardSidebar />
+      <StudentSidebar />
 
       <div className="flex-1 ml-64 px-3">
         {/* Header */}

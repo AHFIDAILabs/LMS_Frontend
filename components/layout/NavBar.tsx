@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/lib/context/AuthContext'
+import { get } from 'http'
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const router = useRouter()
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user,  logout } = useAuth()
+  const isLoggedIn = !!user
 
   const handleLogout = async () => {
     try {
@@ -24,6 +26,20 @@ export function Navbar() {
     if (!user) return 'U'
     return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()
   }
+
+  const getDashboardLink = () => {
+  if (!user) return '#'; // fallback
+  switch (user.role) {
+    case 'admin':
+      return '/dashboard/admin';
+    case 'instructor':
+      return '/dashboard/instructor';
+    case 'student':
+    default:
+      return '/dashboard/students';
+  }
+};
+
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#2A434E] backdrop-blur-xl border-b border-gray-800">
@@ -76,7 +92,7 @@ export function Navbar() {
           
           {/* Auth Buttons / User Menu */}
           <div className="hidden lg:flex items-center space-x-3">
-            {isAuthenticated && user ? (
+            {isLoggedIn ? (
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -107,16 +123,16 @@ export function Navbar() {
                         <p className="text-xs text-gray-400">{user.email}</p>
                       </div>
                       <div className="py-2">
-                        <Link
-                          href="/dashboard/students"
-                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                          </svg>
-                          <span>Dashboard</span>
-                        </Link>
+                      {user && (
+  <Link
+    href={getDashboardLink()}
+    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+    onClick={() => setIsUserMenuOpen(false)}
+  >
+    <span>Dashboard</span>
+  </Link>
+)}
+
                         <Link
                           href="/profile"
                           className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
@@ -215,7 +231,7 @@ export function Navbar() {
         {isMenuOpen && (
           <div className="lg:hidden py-4 border-t border-gray-800">
             <div className="flex flex-col space-y-3">
-              {isAuthenticated && user && (
+              {isLoggedIn && (
                 <div className="px-4 py-3 mb-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full bg-linear-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-black font-semibold">
@@ -265,11 +281,11 @@ export function Navbar() {
                 Contact
               </Link>
 
-              {isAuthenticated && user ? (
+              {isLoggedIn ? (
                 <>
                   <div className="pt-3 border-t border-gray-800">
                     <Link
-                      href="/dashboard"
+                      href={getDashboardLink()}
                       className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium block"
                       onClick={() => setIsMenuOpen(false)}
                     >

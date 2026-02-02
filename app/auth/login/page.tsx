@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -31,12 +30,19 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   
   const router = useRouter()
-  const { login, loading } = useAuth()
+  const { user, login, loading } = useAuth()
 
   // Check for account lockout on mount
   useEffect(() => {
     checkAccountLockout()
   }, [])
+
+
+  useEffect(() => {
+  if (user && !loading) {
+    router.replace('/')
+  }
+}, [user, loading])
 
   // Update remaining time countdown
   useEffect(() => {
@@ -125,7 +131,6 @@ export default function LoginPage() {
   }
 
   const sanitizeInput = (input: string): string => {
-    // Remove potentially dangerous characters
     return input.trim().replace(/[<>]/g, '')
   }
 
@@ -142,7 +147,7 @@ export default function LoginPage() {
 
     // Sanitize inputs
     const sanitizedEmail = sanitizeInput(email)
-    const sanitizedPassword = password // Don't sanitize password, just validate length
+    const sanitizedPassword = password
 
     // Client-side validation
     if (!validateEmail(sanitizedEmail)) {
@@ -156,18 +161,21 @@ export default function LoginPage() {
     }
 
     try {
+      console.log('📝 Submitting login form...')
       await login(sanitizedEmail, sanitizedPassword)
       
       // Clear lockout data on successful login
       clearLockout()
       
-      // Handle "Remember Me" functionality (store preference only, not credentials)
+      // Handle "Remember Me" functionality
       if (rememberMe && typeof window !== 'undefined') {
         localStorage.setItem('remember_email', sanitizedEmail)
       }
       
+      console.log('✅ Login successful, navigation handled by AuthContext')
       // Navigation is handled in AuthContext
     } catch (err: any) {
+      console.error('❌ Login failed in form:', err)
       const errorMessage = err.message || 'Invalid email or password'
       
       // Record failed attempt
@@ -183,12 +191,10 @@ export default function LoginPage() {
   }
 
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth with proper CSRF protection
     console.log('Google login')
   }
 
   const handleGithubLogin = () => {
-    // TODO: Implement GitHub OAuth with proper CSRF protection
     console.log('GitHub login')
   }
 
@@ -203,6 +209,18 @@ export default function LoginPage() {
     }
   }, [])
 
+  // ✅ Show loading state while checking auth
+  if (loading && user) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#EFB14A] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex">
       {/* Left Side - Welcome Section */}
@@ -215,14 +233,10 @@ export default function LoginPage() {
           backgroundRepeat: 'no-repeat',
         }}
       >
-        {/* Overlay for readability */}
         <div className="absolute inset-0 bg-black/60" />
-
-        {/* Ambient glows */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/10 blur-[140px] rounded-full animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/10 blur-[140px] rounded-full animate-pulse delay-1000" />
-
-        {/* Decorative spheres */}
+        
         <div className="absolute inset-0 flex items-center justify-center opacity-20">
           <div className="w-[500px] h-[500px] rounded-full border border-lime-500/20" />
           <div className="absolute w-[400px] h-[400px] rounded-full border border-lime-500/30" />
@@ -241,7 +255,6 @@ export default function LoginPage() {
 
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 relative">
-        {/* Background glow */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#EFB14A]/5 blur-[140px] rounded-full" />
         
         <div className="w-full max-w-md relative z-10">
@@ -402,6 +415,7 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : isLocked ? 'Account Locked' : 'Sign In →'}
             </Button>
           </form>
+
 
           {/* Divider */}
           <div className="flex items-center my-6">

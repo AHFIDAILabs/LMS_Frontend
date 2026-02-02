@@ -31,12 +31,24 @@ export const courseService = {
   // =====================================================
   // STUDENT
   // =====================================================
-  getMyCourses: async () => {
-    const response = await fetchWithAuth(`${API_URL}/courses/student/my-courses`, {
-      credentials: 'include',
-    });
-    return handleResponse(response);
-  },
+getMyCourses: async () => {
+  const response = await fetchWithAuth(`${API_URL}/courses/student/my-courses`, {
+    credentials: 'include',
+  });
+  const data = await handleResponse(response);
+
+  if (!data.success) {
+    throw new Error(data.message || data.error || 'Failed to fetch courses');
+  }
+
+  // Guarantee we always return an array — never null, undefined, or {}
+  if (!Array.isArray(data.data)) {
+    return [];
+  }
+
+  return data.data;
+},
+
 
   enrollInCourse: async (courseId: string) => {
     const response = await fetchWithAuth(`${API_URL}/courses/${courseId}/enroll`, {

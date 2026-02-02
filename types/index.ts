@@ -1,6 +1,7 @@
 // ============= USER & AUTH =============
 export interface User {
   _id: string
+  id: string
   firstName: string
   lastName: string
   email: string
@@ -15,6 +16,18 @@ export interface User {
   enrollmentDate?: string
   lastLogin?: string
 }
+
+
+export interface GetAllUsersResponse {
+  success: boolean;
+  data: User[];
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  error?: string;
+}
+
 
 
 export interface AuthResponse {
@@ -396,6 +409,12 @@ export interface ApiResponse<T> {
   data: T | null;
   error?: string;
   message?: string;
+
+ // Optional pagination
+  count?: number;
+  total?: number;
+  page?: number;
+  pages?: number;
 }
 
 
@@ -436,6 +455,7 @@ export type Instructor = {
 
 
 export interface Program {
+  name: string
   _id: string;
   title: string;
   slug: string;

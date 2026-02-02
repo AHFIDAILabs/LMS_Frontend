@@ -4,6 +4,8 @@ export interface User {
   lastName: string
   email: string
   role: 'admin' | 'student' | 'instructor'
+  programId?: string[]
+  courseIds?: string[]
   status: string
   profileImage?: string
   phoneNumber?: string

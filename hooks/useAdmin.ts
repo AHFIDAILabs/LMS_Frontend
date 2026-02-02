@@ -1,7 +1,9 @@
 // hooks/useAdmin.ts
+'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '@/services/adminService';
-import { User } from '@/types/user';
+import { User } from '@/types';
+import { useAuth } from '@/lib/context/AuthContext';
 
 // =============================
 // TYPES
@@ -35,71 +37,96 @@ interface ApiResponse<T> {
 // DASHBOARD STATS
 // =============================
 export const useDashboardStats = () => {
-  const [data, setData] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, isAuthenticated, loading: authLoading } = useAuth()
+
+  const [data, setData] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
+    // ⛔ Wait for auth to initialize
+    if (authLoading) return
+
+    // ⛔ Only admins allowed
+    if (!isAuthenticated || user?.role !== 'admin') {
+      setLoading(false)
+      return
+    }
+
     try {
-      setLoading(true);
-      setError(null);
-      const response = await adminService.getDashboardStats() as ApiResponse<DashboardStats>;
-      if (response.success && response.data) {
-        setData(response.data);
+      setLoading(true)
+      setError(null)
+
+      const res = await adminService.getDashboardStats() as ApiResponse<DashboardStats>
+
+      if (res.success && res.data) {
+        setData(res.data)
       } else {
-        setError(response.error || 'Failed to fetch dashboard stats');
+        setError(res.error || 'Failed to fetch stats')
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [authLoading, isAuthenticated, user])
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchStats()
+  }, [fetchStats])
 
-  return { data, loading, error, refetch: fetchStats };
-};
+  return { data, loading: loading || authLoading, error, refetch: fetchStats }
+}
 
 // =============================
 // USER MANAGEMENT
 // =============================
 export const useUsers = (params?: Record<string, string | number>) => {
-  const [data, setData] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<any>(null);
+ const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const [data, setData] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [pagination, setPagination] = useState<any>(null)
 
-  const fetchUsers = useCallback(async () => {
+const fetchUsers = useCallback(async () => {
+    // 🚫 Wait for auth to initialize
+    if (authLoading) return
+
+    // 🚫 Only admins can fetch users
+    if (!isAuthenticated || user?.role !== 'admin') {
+      setData([])
+      setPagination(null)
+      setLoading(false)
+      return
+    }
+
     try {
-      setLoading(true);
-      setError(null);
-      const response = await adminService.getAllUsers(params) as ApiResponse<{
-        users: User[];
-        pagination?: any;
-      }>;
-      
+      setLoading(true)
+      setError(null)
+      const response = (await adminService.getAllUsers(params)) as ApiResponse<{
+        data: User[]
+        pagination?: any
+      }>
+
       if (response.success && response.data) {
-        setData(response.data.users || []);
-        setPagination(response.data.pagination);
+        setData(response.data.data || [])
+        setPagination(response.data.pagination)
       } else {
-        setError(response.error || 'Failed to fetch users');
+        setError(response.error || 'Failed to fetch users')
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || 'An error occurred while fetching users')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [params]);
+  }, [authLoading, isAuthenticated, user, params])
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchUsers()
+  }, [fetchUsers])
 
-  return { data, loading, error, pagination, refetch: fetchUsers };
-};
+  return { data, loading: loading || authLoading, error, pagination, refetch: fetchUsers }
+}
 
 export const useUser = (userId: string) => {
   const [data, setData] = useState<User | null>(null);
@@ -338,17 +365,13 @@ export const usePromoteToInstructor = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const promote = useCallback(async (userId: string) => {
+  const promote = useCallback(async (userId: string, programId?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await adminService.promoteToInstructor(userId) as ApiResponse<User>;
-      
-      if (response.success) {
-        return response.data;
-      } else {
-        throw new Error(response.error || 'Failed to promote user to instructor');
-      }
+      const response = await adminService.promoteToInstructor(userId, programId) as ApiResponse<User>;
+      if (response.success) return response.data;
+      throw new Error(response.error || 'Failed to promote user to instructor');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       throw err;

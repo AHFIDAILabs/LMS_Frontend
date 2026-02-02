@@ -23,9 +23,8 @@ export function getAuthToken(): string | null {
 export async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
   try {
     const contentType = response.headers.get("content-type");
-    let data;
-    
-    // Check if the response is actually JSON before parsing
+    let data: any;
+
     if (contentType && contentType.includes("application/json")) {
       data = await response.json();
     } else {
@@ -36,52 +35,98 @@ export async function handleResponse<T>(response: Response): Promise<ApiResponse
       return {
         success: false,
         error: data?.error || data?.message || `Error ${response.status}`,
-        data: null as any
+        data: null,
       };
     }
 
-    // If the backend sends { success: true, data: [...] }
-    return data; 
-  } catch (error: any) {
+    // Build generic ApiResponse
+    const apiResponse: ApiResponse<T> = {
+      success: data.success ?? true,
+      data: data.data ?? (data as T), // fallback: treat whole response as data if no 'data' key
+      error: data.success === false ? data.error || data.message || null : null,
+    };
+
+    // Attach optional pagination if present
+    if (typeof data.count === "number") apiResponse.count = data.count;
+    if (typeof data.total === "number") apiResponse.total = data.total;
+    if (typeof data.page === "number") apiResponse.page = data.page;
+    if (typeof data.pages === "number") apiResponse.pages = data.pages;
+
+    return apiResponse;
+  } catch (err: any) {
     return {
       success: false,
-      error: "Network or Parsing error",
-      data: null as any
+      error: "Network or parsing error",
+      data: null,
     };
   }
 }
 /**
  * Make authenticated fetch requests (client-side only)
  */
-export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   // Prevent SSR fetch calls
   if (typeof window === 'undefined') {
     throw new Error('fetchWithAuth can only be called on the client side')
   }
 
-  const token = getAuthToken()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'
 
-  const headers: any = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  }
-  
-  // Add auth token if available (optional)
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-  
-  try {
-    const response = await fetch(url, { 
-      ...options, 
-      headers, 
+  // Builds and fires the request using whatever token is currently in storage
+  const makeRequest = async (): Promise<Response> => {
+    const token = getAuthToken()
+
+    const headers: any = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    return fetch(url, {
+      ...options,
+      headers,
       credentials: 'include',
     })
-    return response
-  } catch (error) {
-    console.error('Fetch error:', error)
-    throw error
   }
+
+  let response = await makeRequest()
+
+  // --- 401 recovery: attempt a single token refresh, then retry ---
+  if (response.status === 401) {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: refreshToken ? JSON.stringify({ refreshToken }) : undefined,
+      })
+
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+
+        if (refreshData.accessToken) {
+          // Persist the new tokens
+          localStorage.setItem('authToken', refreshData.accessToken)
+          if (refreshData.refreshToken) {
+            localStorage.setItem('refreshToken', refreshData.refreshToken)
+          }
+
+          // Retry the original request — makeRequest() will pick up the new token
+          response = await makeRequest()
+        }
+      }
+      // If refresh itself returned non-ok, fall through and return the original 401
+    } catch {
+      // Refresh request failed entirely — return the original 401 as-is
+    }
+  }
+
+  return response
 }
 
 /**
