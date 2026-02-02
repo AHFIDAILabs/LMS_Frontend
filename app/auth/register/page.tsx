@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/lib/context/AuthContext'
+import toast from 'react-hot-toast'
 
 // Password strength requirements
 interface PasswordStrength {
@@ -30,7 +31,6 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(false)
-  const [error, setError] = useState('')
   const [passwordStrength, setPasswordStrength] = useState<PasswordStrength | null>(null)
   
   const router = useRouter()
@@ -105,48 +105,48 @@ export default function RegisterPage() {
   const validateForm = (): boolean => {
     // Name validation
     if (!validateName(firstName)) {
-      setError('First name must be 2-50 characters and contain only letters')
+      toast.error('First name must be 2-50 characters and contain only letters')
       return false
     }
 
     if (!validateName(lastName)) {
-      setError('Last name must be 2-50 characters and contain only letters')
+      toast.error('Last name must be 2-50 characters and contain only letters')
       return false
     }
 
     // Email validation
     if (!validateEmail(email)) {
-      setError('Please enter a valid email address')
+      toast.error('Please enter a valid email address')
       return false
     }
 
     // Password validation
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long')
+      toast.error('Password must be at least 8 characters long')
       return false
     }
 
     if (password.length > 128) {
-      setError('Password must not exceed 128 characters')
+      toast.error('Password must not exceed 128 characters')
       return false
     }
 
     // Check password strength requirements
     const strength = checkPasswordStrength(password)
     if (!strength.requirements.uppercase || !strength.requirements.lowercase || !strength.requirements.number) {
-      setError('Password must contain uppercase, lowercase, and numbers')
+      toast.error('Password must contain uppercase, lowercase, and numbers')
       return false
     }
 
     // Password match validation
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      toast.error('Passwords do not match')
       return false
     }
 
     // Terms validation
     if (!agreeTerms) {
-      setError('Please accept the terms and conditions')
+      toast.error('Please accept the terms and conditions')
       return false
     }
 
@@ -155,7 +155,6 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
 
     // Validate form
     if (!validateForm()) {
@@ -174,19 +173,21 @@ export default function RegisterPage() {
         email: sanitizedEmail, 
         password 
       })
+      toast.success('Account created successfully! Redirecting...')
       // Navigation is handled in AuthContext
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
+      const errorMessage = err.message || 'Registration failed. Please try again.'
+      toast.error(errorMessage)
     }
   }
 
   const handleGoogleSignup = () => {
-    // TODO: Implement Google OAuth
+    toast('Google signup coming soon!')
     console.log('Google signup')
   }
 
   const handleGithubSignup = () => {
-    // TODO: Implement GitHub OAuth
+    toast('GitHub signup coming soon!')
     console.log('GitHub signup')
   }
 
@@ -265,7 +266,7 @@ export default function RegisterPage() {
             <div className="w-10 h-10 rounded-lg bg-linear-to-br from-lime-500 to-emerald-500 flex items-center justify-center">
               <span className="text-slate-900 font-bold text-xl">A</span>
             </div>
-            <span className="text-xl font-bold text-white">AI Accelerator</span>
+            <span className="text-xl font-bold text-white">AI4SID~Academy</span>
           </Link>
 
           {/* Header */}
@@ -489,12 +490,6 @@ export default function RegisterPage() {
               </label>
             </div>
 
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
             <Button
               type="submit"
               variant="primary"
@@ -570,7 +565,7 @@ export default function RegisterPage() {
 
           {/* Copyright */}
           <div className="mt-4 text-center text-xs text-gray-600">
-            © 2024 AI Accelerator. All rights reserved.
+            © 2024 AI4SID~Academy. All rights reserved.
           </div>
         </div>
       </div>

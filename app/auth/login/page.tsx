@@ -5,11 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/lib/context/AuthContext'
+import toast from 'react-hot-toast'
 
-// Security constants
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 // minutes
-const ATTEMPT_STORAGE_KEY = 'login_attempts'
 const LOCKOUT_STORAGE_KEY = 'account_lockout'
 
 interface LoginAttempt {
@@ -22,42 +21,30 @@ interface LoginAttempt {
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [warning, setWarning] = useState('')
   const [isLocked, setIsLocked] = useState(false)
   const [remainingTime, setRemainingTime] = useState(0)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  
+
   const router = useRouter()
   const { user, login, loading } = useAuth()
 
-  // Check for account lockout on mount
-  useEffect(() => {
-    checkAccountLockout()
-  }, [])
-
+  useEffect(() => { checkAccountLockout() }, [])
 
   useEffect(() => {
-  if (user && !loading) {
-    router.replace('/')
-  }
-}, [user, loading])
+    if (user && !loading) router.replace('/')
+  }, [user, loading, router])
 
-  // Update remaining time countdown
   useEffect(() => {
     if (isLocked && remainingTime > 0) {
       const timer = setInterval(() => {
         const lockoutData = getLockoutData()
-        if (lockoutData && lockoutData.lockedUntil) {
+        if (lockoutData?.lockedUntil) {
           const remaining = Math.ceil((lockoutData.lockedUntil - Date.now()) / 60000)
           if (remaining <= 0) {
             clearLockout()
-            setIsLocked(false)
-            setRemainingTime(0)
-          } else {
-            setRemainingTime(remaining)
-          }
+            toast.success('You can try logging in again.')
+          } else setRemainingTime(remaining)
         }
       }, 1000)
       return () => clearInterval(timer)
@@ -70,146 +57,91 @@ export default function LoginPage() {
     return data ? JSON.parse(data) : null
   }
 
-  const setLockoutData = (data: LoginAttempt) => {
-    if (typeof window === 'undefined') return
+  const setLockoutData = (data: LoginAttempt) =>
     localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(data))
-  }
 
   const clearLockout = () => {
-    if (typeof window === 'undefined') return
     localStorage.removeItem(LOCKOUT_STORAGE_KEY)
     setIsLocked(false)
     setRemainingTime(0)
-    setWarning('')
   }
 
   const checkAccountLockout = () => {
     const lockoutData = getLockoutData()
-    if (!lockoutData || !lockoutData.lockedUntil) return
-
+    if (!lockoutData?.lockedUntil) return
     const now = Date.now()
     if (lockoutData.lockedUntil > now) {
       const remaining = Math.ceil((lockoutData.lockedUntil - now) / 60000)
       setIsLocked(true)
       setRemainingTime(remaining)
-      setError(`Account temporarily locked. Try again in ${remaining} minutes.`)
-    } else {
-      clearLockout()
-    }
+      toast.error(`Account locked. Try again in ${remaining} minute${remaining !== 1 ? 's' : ''}.`)
+    } else clearLockout()
   }
 
   const recordFailedAttempt = (userEmail: string) => {
-    const lockoutData = getLockoutData() || {
-      email: userEmail,
-      attempts: 0,
-      lastAttempt: Date.now()
-    }
+    const lockoutData = getLockoutData() || { email: userEmail, attempts: 0, lastAttempt: Date.now() }
 
-    lockoutData.attempts += 1
+    lockoutData.attempts++
     lockoutData.lastAttempt = Date.now()
 
     if (lockoutData.attempts >= MAX_LOGIN_ATTEMPTS) {
-      lockoutData.lockedUntil = Date.now() + (LOCKOUT_DURATION * 60 * 1000)
+      lockoutData.lockedUntil = Date.now() + LOCKOUT_DURATION * 60 * 1000
       setIsLocked(true)
       setRemainingTime(LOCKOUT_DURATION)
-      setError(`Too many failed attempts. Account locked for ${LOCKOUT_DURATION} minutes.`)
+      toast.error(`Too many failed attempts. Locked for ${LOCKOUT_DURATION} minutes.`)
     } else {
       const remaining = MAX_LOGIN_ATTEMPTS - lockoutData.attempts
-      setWarning(`${remaining} attempt${remaining !== 1 ? 's' : ''} remaining before account lockout`)
+      toast(`⚠️ ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`)
     }
 
     setLockoutData(lockoutData)
   }
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 8
-  }
-
-  const sanitizeInput = (input: string): string => {
-    return input.trim().replace(/[<>]/g, '')
-  }
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const validatePassword = (password: string) => password.length >= 8
+  const sanitizeInput = (input: string) => input.trim().replace(/[<>]/g, '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setWarning('')
 
-    // Check if account is locked
     if (isLocked) {
-      setError(`Account is locked. Try again in ${remainingTime} minutes.`)
+      toast.error(`Account locked. Try again in ${remainingTime} minute${remainingTime !== 1 ? 's' : ''}.`)
       return
     }
 
-    // Sanitize inputs
     const sanitizedEmail = sanitizeInput(email)
     const sanitizedPassword = password
 
-    // Client-side validation
     if (!validateEmail(sanitizedEmail)) {
-      setError('Please enter a valid email address')
+      toast.error('Please enter a valid email address')
       return
     }
 
     if (!validatePassword(sanitizedPassword)) {
-      setError('Password must be at least 8 characters long')
+      toast.error('Password must be at least 8 characters long')
       return
     }
 
     try {
-      console.log('📝 Submitting login form...')
       await login(sanitizedEmail, sanitizedPassword)
-      
-      // Clear lockout data on successful login
       clearLockout()
-      
-      // Handle "Remember Me" functionality
-      if (rememberMe && typeof window !== 'undefined') {
-        localStorage.setItem('remember_email', sanitizedEmail)
-      }
-      
-      console.log('✅ Login successful, navigation handled by AuthContext')
-      // Navigation is handled in AuthContext
+      toast.success('Login successful! Redirecting...')
+      if (rememberMe) localStorage.setItem('remember_email', sanitizedEmail)
     } catch (err: any) {
-      console.error('❌ Login failed in form:', err)
       const errorMessage = err.message || 'Invalid email or password'
-      
-      // Record failed attempt
       recordFailedAttempt(sanitizedEmail)
-      
-      // Check if backend returned lockout warning
-      if (err.warning) {
-        setWarning(err.warning)
-      }
-      
-      setError(errorMessage)
+      toast.error(errorMessage)
     }
   }
 
-  const handleGoogleLogin = () => {
-    console.log('Google login')
-  }
+  const handleGoogleLogin = () => { toast('Google login clicked'); console.log('Google login') }
+  const handleGithubLogin = () => { toast('GitHub login clicked'); console.log('GitHub login') }
 
-  const handleGithubLogin = () => {
-    console.log('GitHub login')
-  }
-
-  // Load remembered email on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const rememberedEmail = localStorage.getItem('remember_email')
-      if (rememberedEmail) {
-        setEmail(rememberedEmail)
-        setRememberMe(true)
-      }
-    }
+    const rememberedEmail = localStorage.getItem('remember_email')
+    if (rememberedEmail) { setEmail(rememberedEmail); setRememberMe(true) }
   }, [])
 
-  // ✅ Show loading state while checking auth
   if (loading && user) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -263,7 +195,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-lg bg-linear-to-br from-lime-500 to-emerald-500 flex items-center justify-center">
               <span className="text-slate-900 font-bold text-xl">A</span>
             </div>
-            <span className="text-xl font-bold text-white">AI Accelerator</span>
+            <span className="text-xl font-bold text-white">AI4SID~Academy</span>
           </Link>
 
           {/* Header */}
@@ -384,25 +316,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Warning Message */}
-            {warning && !isLocked && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-4 py-3 rounded-lg text-sm">
-                <div className="flex items-start space-x-2">
-                  <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span>{warning}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
-
             <Button
               type="submit"
               variant="primary"
@@ -415,7 +328,6 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : isLocked ? 'Account Locked' : 'Sign In →'}
             </Button>
           </form>
-
 
           {/* Divider */}
           <div className="flex items-center my-6">
@@ -479,7 +391,7 @@ export default function LoginPage() {
 
           {/* Copyright */}
           <div className="mt-4 text-center text-xs text-gray-600">
-            © 2024 AI Accelerator. All rights reserved.
+            © 2024 AI4SID~Academy. All rights reserved.
           </div>
         </div>
       </div>

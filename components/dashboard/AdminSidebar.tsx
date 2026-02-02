@@ -42,47 +42,47 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       {
         label: 'Users',
-        href: '/dashboard/users',
+        href: '/dashboard/admin/users',
         icon: Users,
         children: [
-          { label: 'All Users', href: '/dashboard/users', icon: Users },
-          { label: 'Students', href: '/dashboard/users/students', icon: Users },
-          { label: 'Instructors', href: '/dashboard/users/instructors', icon: Users },
+          { label: 'All Users', href: '/dashboard/admin/users', icon: Users },
+          { label: 'Students', href: '/dashboard/admin/users/students', icon: Users },
+          { label: 'Instructors', href: '/dashboard/admin/users/instructors', icon: Users },
         ],
       },
            {
         label: 'Programs',
-        href: '/dashboard/programs',
+        href: '/dashboard/admin/programes',
         icon: Layers,
         children: [
-          { label: 'All Programs', href: '/dashboard/programs', icon: Layers },
-          { label: 'Course', href: '/dashboard/programs/course', icon: Layers },
+          { label: 'All Programs', href: '/dashboard/admin/programes', icon: Layers },
+          { label: 'Course', href: '/dashboard/admin/programes/course', icon: Layers },
         ],
       },
       {
         label: 'Courses',
-        href: '/dashboard/courses',
+        href: '/dashboard/admin/courses',
         icon: BookOpen,
         children: [
-          { label: 'All Courses', href: '/dashboard/courses', icon: BookOpen },
-          { label: 'Programs', href: '/dashboard/programs', icon: Layers },
+          { label: 'All Courses', href: '/dashboard/admin/courses', icon: BookOpen },
+          { label: 'Programs', href: '/dashboard/admin/programes', icon: Layers },
         ],
       },
-      { label: 'Approvals', href: '/dashboard/approvals', icon: CheckCircle2 },
-      { label: 'Enrollments', href: '/dashboard/enrollments', icon: FileText },
+      { label: 'Approvals', href: '/dashboard/admin/approvals', icon: CheckCircle2 },
+      { label: 'Enrollments', href: '/dashboard/admin/enrollments', icon: FileText },
     ],
   },
   {
     label: 'Reports',
     items: [
-      { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-      { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
+      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
+      { label: 'Certificates', href: '/dashboard/admin/certificates', icon: Award },
     ],
   },
   {
     label: 'System',
     items: [
-      { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+      { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings },
     ],
   },
 ]
