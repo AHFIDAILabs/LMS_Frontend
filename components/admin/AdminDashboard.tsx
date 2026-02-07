@@ -19,11 +19,15 @@ import RecentActivity from './RecentActivity';
 import DashboardSidebar from '@/components/dashboard/StudentSidebar';
 import { CircularProgress } from '@/components/ui/ProgressBar';
 import AdminSidebar from '../dashboard/AdminSidebar';
-import { log } from 'console';
+import Image from "next/image";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const AdminDashboard = () => {
   const { dashboardStats } = useAdminContext();
   const { data, loading, error } = dashboardStats;
+
+  const { user } = useAuth();
+
 
   // ── Loading ───────────────────────────────────────────
   if (loading) {
@@ -237,7 +241,7 @@ const AdminDashboard = () => {
                     { href: '/dashboard/admin/instructors', label: 'Manage Instructors' },
                     { href: '/dashboard/admin/users', label: 'Manage Users' },
                     
-                    { href: '/dashboard/admin/enrollments', label: 'View Enrollments' },
+                    { href: '/dashboard/admin/enrollment', label: 'View Enrollments' },
                     { href: '/dashboard/admin/certificates', label: 'Certificates' },
                   ].map((link) => (
                     <Link

@@ -154,7 +154,7 @@ export default function AdminProgramsPage() {
           </div>
           
           <Link
-            href="/dashboard/admin/programs/create"
+            href="/dashboard/admin/programes/create"
             className="flex items-center gap-2 bg-lime-500 hover:bg-lime-600 text-slate-900 px-4 py-2 rounded-xl font-semibold transition-colors"
           >
             <Plus size={20} />

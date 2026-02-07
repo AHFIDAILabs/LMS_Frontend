@@ -6,6 +6,7 @@ import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { programService } from '@/services/programService'
 import { courseService } from '@/services/courseService'
+import { Course } from '@/types'
 import {
   ArrowLeft,
   Plus,
@@ -15,12 +16,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-interface Course {
-  _id: string
-  title: string
-  category: string
-  level: string
-}
 
 export default function CreateProgramPage() {
   const router = useRouter()
@@ -180,7 +175,7 @@ export default function CreateProgramPage() {
       <div className="flex-1 ml-64 p-8">
         {/* Back Button */}
         <Link
-          href="/dashboard/admin/programs"
+          href="/dashboard/admin/programes"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -345,13 +340,26 @@ export default function CreateProgramPage() {
 
             {/* Course Selection */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+            <div className='flex row-end-1 justify-between items-center bg-slate-800/50 backdrop-blur rounded-2xl border border-gray-700 p-6'>
+                         <div className='row-end-1 justify-between items-center'>
+
               <h2 className="text-xl font-bold text-white mb-4">
                 Add Courses to Program
               </h2>
               <p className="text-gray-400 text-sm mb-4">
                 Select courses to include in this program (optional)
               </p>
-              
+
+              </div>
+
+                <Link
+            href="/dashboard/admin/courses/create"
+            className="flex items-center gap-2 bg-lime-500 hover:bg-lime-600 text-slate-900 px-4 py-2 rounded-xl font-semibold transition-colors"
+          >
+            <Plus size={20} />
+            Create Course
+          </Link>
+              </div>
               {courses.length > 0 ? (
                 <div className="grid sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
                   {courses.map(course => (

@@ -162,7 +162,7 @@ export const ProgramsGrid = ({
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Link href={`/programs/slug/[slug]`.replace('[slug]', slug)}>
+                <Link href={`/programs/slug/${slug}`}>
                   <div className="group bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 hover:border-[#FF6B35]/50 transition-all duration-300 hover:scale-105 h-full flex flex-col">
                     
                     {/* Image */}
@@ -190,7 +190,7 @@ export const ProgramsGrid = ({
                       </p>
 
                       <div className="flex items-center justify-between mt-auto">
-                        <span className="text-xl font-bold text-white">{priceText}</span>
+                        {/* <span className="text-xl font-bold text-white">{priceText}</span> */}
                         <div className="flex items-center gap-1 text-[#FF6B35] font-semibold text-sm">
                           Details <ArrowRight className="w-4 h-4" />
                         </div>

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
+import Image from "next/image"
 import clsx from 'clsx'
 import {
   LayoutDashboard,
@@ -32,8 +33,8 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overview',
     items: [
-      { label: 'Dashboard', href: '/instructor/dashboard', icon: LayoutDashboard },
-      { label: 'Notifications', href: '/instructor/notifications', icon: Bell },
+      { label: 'Dashboard', href: '/dashboard/instructor', icon: LayoutDashboard },
+      { label: 'Notifications', href: '/dashboard/instructor/notifications', icon: Bell },
     ],
   },
   {
@@ -41,37 +42,37 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       {
         label: 'My Courses',
-        href: '/instructor/courses',
+        href: '/dashboard/instructor/courses',
         icon: BookOpen,
         children: [
-          { label: 'All My Courses', href: '/instructor/courses', icon: BookOpen },
-          { label: 'Create Course', href: '/instructor/courses/create', icon: PenLine },
+          { label: 'All My Courses', href: '/dashboard/instructor/courses', icon: BookOpen },
+          { label: 'Create Course', href: '/dashboard/instructor/courses/create', icon: PenLine },
         ],
       },
       {
         label: 'Content',
-        href: '/instructor/content',
+        href: '/dashboard/instructor/content',
         icon: Video,
         children: [
-          { label: 'Modules', href: '/instructor/content/modules', icon: Layers },
-          { label: 'Lessons', href: '/instructor/content/lessons', icon: FileText },
-          { label: 'Assessments', href: '/instructor/content/assessments', icon: PenLine },
+          { label: 'Modules', href: '/dashboard/instructor/content/modules', icon: Layers },
+          { label: 'Lessons', href: '/dashboard/instructor/content/lessons', icon: FileText },
+          { label: 'Assessments', href: '/dashboard/instructor/content/assessments', icon: PenLine },
         ],
       },
-      { label: 'My Students', href: '/instructor/students', icon: Users },
+      { label: 'My Students', href: '/dashboard/instructor/students', icon: Users },
     ],
   },
   {
     label: 'Reports',
     items: [
-      { label: 'Analytics', href: '/instructor/analytics', icon: BarChart3 },
-      { label: 'Submissions', href: '/instructor/submissions', icon: FileText },
+      { label: 'Analytics', href: '/dashboard/instructor/analytics', icon: BarChart3 },
+      { label: 'Submissions', href: '/dashboard/instructor/submissions', icon: FileText },
     ],
   },
   {
     label: 'Account',
     items: [
-      { label: 'Settings', href: '/instructor/settings', icon: Settings },
+      { label: 'Settings', href: '/dashboard/instructor/settings', icon: Settings },
     ],
   },
 ]
@@ -186,17 +187,25 @@ export default function InstructorSidebar() {
       {/* Footer */}
       <div className="border-t border-gray-800">
         <div className="flex items-center gap-3 p-4">
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-300 shrink-0">
-            {(user?.firstName?.[0] || '').toUpperCase()}
-            {(user?.lastName?.[0] || '').toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-          </div>
-        </div>
+                 <div className="relative w-9 h-9 shrink-0">
+         <Image
+           src={
+             user?.profileImage ||
+             "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
+           }
+           alt={user?.firstName || "Admin"}
+           fill
+           className="rounded-full object-cover border border-gray-700"
+         />
+       </div>
+       
+                 <div className="flex-1 min-w-0">
+                   <p className="text-sm font-medium text-white truncate">
+                     {user?.firstName} {user?.lastName}
+                   </p>
+                   <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                 </div>
+               </div>
 
         <div className="px-3 pb-3">
           <button

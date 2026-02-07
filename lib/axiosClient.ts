@@ -12,47 +12,44 @@ export const axiosClient = axios.create({
 
 // Attach access token automatically
 axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('authToken')
+    if (token) config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
+
 
 // 🔁 Handle 401 + refresh token
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
+    if (!originalRequest) return Promise.reject(error)
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-
       try {
+        if (typeof window === 'undefined') throw new Error('No refresh token on server')
+
         const refreshToken = localStorage.getItem('refreshToken')
+        if (!refreshToken) throw new Error('No refresh token found')
 
-        const res = await axios.post(
-          `${API_URL}/auth/refresh`,
-          refreshToken ? { refreshToken } : {},
-          { withCredentials: true }
-        )
+        const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken }, { withCredentials: true })
+        const newToken = res.data.accessToken
+        localStorage.setItem('authToken', newToken)
 
-        const newAccessToken = res.data.accessToken
-        localStorage.setItem('authToken', newAccessToken)
-
-        if (res.data.refreshToken) {
-          localStorage.setItem('refreshToken', res.data.refreshToken)
-        }
-
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
         return axiosClient(originalRequest)
-      } catch (refreshError) {
+      } catch (err) {
         localStorage.removeItem('authToken')
         localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
+        window.location.replace('/login')
+        return Promise.reject(err)
       }
     }
 
     return Promise.reject(error)
   }
 )
+

@@ -1,186 +1,212 @@
-'use client'
-
-import { motion } from 'framer-motion'
-import { ArrowRight, Sparkles, TrendingUp, Award } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/Button'
+import { ArrowRight, Zap, Users, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 
-export const ProgramHero = () => {
+export function ProgramHero() {
+  const images = [
+    '/images/Dr.Kay3.jpeg',
+    '/images/Dr.Kay1.jpeg',
+    '/images/Dr.Kay2.jpeg',
+  ]
+
+  const [currentImage, setCurrentImage] = useState(0)
+
+  // Change image every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImage(prev => (prev + 1) % images.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center px-4 overflow-hidden bg-linear-to-br from-[#2A434E] via-[#1f3238] to-[#2A434E]">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-[#FF6B35]/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#FF6B35]/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
+    <section
+      className="relative min-h-screen w-full flex items-center justify-center bg-cover bg-center transition-all duration-1000"
+      style={{ backgroundImage: `url('${images[currentImage]}')` }}
+    >
+      {/* Overlay - Darker for better text contrast */}
+      <div className="absolute inset-0 bg-linear-to-br from-black/90 via-black/85 to-slate-900/90" /> 
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left Content */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6"
-            >
-              <Sparkles className="w-4 h-4 text-[#FF6B35]" />
-              <span className="text-sm font-semibold text-white">Professional Learning Programs</span>
-            </motion.div>
+      {/* Subtle ambient glow - reduced intensity */}
+      <div className="absolute top-1/4 -left-20 w-96 h-96 bg-lime-500/5 rounded-full blur-[100px]" />
+      <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-emerald-500/5 rounded-full blur-[100px]" />
 
-            {/* Main Heading */}
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
-            >
-              Transform Your Career With
-              <span className="text-[#FF6B35]"> Expert-Led Programs</span>
-            </motion.h1>
+      {/* Content */}
+      <div className="relative z-10 container-custom py-32">
+        <div className="max-w-6xl mx-auto">
+          
+          {/* Main Headline */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-white mb-6">
+              Build Future-Ready Skills in
+              <br />
+              <span className="bg-linear-to-r from-lime-400 via-emerald-400 to-lime-500 bg-clip-text text-transparent">
+                AI, Data & Digital Policy
+              </span>
+            </h1>
 
-            {/* Description */}
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="text-xl text-gray-300 mb-8 max-w-xl"
-            >
-              Master in-demand skills through comprehensive, structured learning paths designed by industry experts. Build real-world projects and earn recognized certifications.
-            </motion.p>
+            <p className="text-xl md:text-2xl text-gray-300 font-light max-w-3xl mx-auto">
+              Choose your path: Bootcamps, Fellowships, or AI Programs.
+            </p>
+          </div>
 
-            {/* CTA Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Link href="/allPrograms">
-                <button className="group px-8 py-4 bg-[#FF6B35] text-white rounded-full font-semibold hover:bg-[#f85a28] transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B35]/50">
-                  Explore Programs
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </Link>
-              <Link href="/courses">
-                <button className="px-8 py-4 border-2 border-white/30 text-white rounded-full font-semibold hover:bg-white/10 transition-all duration-300 backdrop-blur-sm">
-                  View Course Catalog
-                </button>
-              </Link>
-            </motion.div>
+          {/* Program Cards */}
+          <div className="grid md:grid-cols-3 gap-6 mt-16 max-w-5xl mx-auto">
+            
+            {/* Bootcamps Card */}
+            <ProgramCard
+              icon={<Zap className="w-8 h-8" />}
+              title="Bootcamps"
+              description="Intensive hands-on training in AI & data skills"
+              features={[ "Project-based", "Job-ready"]}
+              href="/bootcamps"
+              accentColor="lime"
+            />
 
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-white/10"
-            >
-              <div>
-                <div className="text-3xl font-bold text-white mb-1">50+</div>
-                <div className="text-sm text-gray-400">Expert Instructors</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white mb-1">10K+</div>
-                <div className="text-sm text-gray-400">Students Enrolled</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white mb-1">95%</div>
-                <div className="text-sm text-gray-400">Success Rate</div>
-              </div>
-            </motion.div>
-          </motion.div>
+            {/* Fellowships Card */}
+            <ProgramCard
+              icon={<Users className="w-8 h-8" />}
+              title="Fellowships"
+              description="Advanced learning with mentorship & networking"
+              features={[ "Expert guidance", "Industry network"]}
+              href="/fellowships"
+              accentColor="emerald"
+            />
 
-          {/* Right Content - Feature Cards */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="hidden lg:block"
-          >
-            <div className="grid grid-cols-2 gap-6">
-              {/* Card 1 */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-[#FF6B35]/50 transition-all duration-300"
-              >
-                <div className="w-12 h-12 bg-[#FF6B35]/20 rounded-xl flex items-center justify-center mb-4">
-                  <TrendingUp className="w-6 h-6 text-[#FF6B35]" />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-2">Career Growth</h3>
-                <p className="text-gray-400 text-sm">Fast-track your career with industry-relevant skills</p>
-              </motion.div>
+            {/* AI Programs Card */}
+            <ProgramCard
+              icon={<Briefcase className="w-8 h-8" />}
+              title="AI Programs"
+              description="Specialized courses in cutting-edge AI technologies"
+              features={["Flexible pace", "Real projects"]}
+              href="/allPrograms"
+              accentColor="yellow"
+            />
+          </div>
 
-              {/* Card 2 */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-[#FF6B35]/50 transition-all duration-300 mt-12"
-              >
-                <div className="w-12 h-12 bg-[#FF6B35]/20 rounded-xl flex items-center justify-center mb-4">
-                  <Award className="w-6 h-6 text-[#FF6B35]" />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-2">Certification</h3>
-                <p className="text-gray-400 text-sm">Earn recognized certificates to showcase your expertise</p>
-              </motion.div>
-
-              {/* Card 3 */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:border-[#FF6B35]/50 transition-all duration-300"
-              >
-                <div className="w-12 h-12 bg-[#FF6B35]/20 rounded-xl flex items-center justify-center mb-4">
-                  <Sparkles className="w-6 h-6 text-[#FF6B35]" />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-2">Real Projects</h3>
-                <p className="text-gray-400 text-sm">Build portfolio-worthy projects with hands-on practice</p>
-              </motion.div>
-
-              {/* Card 4 */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-                className="bg-linear-to-br from-[#FF6B35] to-[#f85a28] rounded-2xl p-6 shadow-lg shadow-[#FF6B35]/20 mt-12"
-              >
-                <div className="text-white/90 text-sm font-semibold mb-2">Popular</div>
-                <h3 className="text-white font-bold text-lg mb-2">AI Engineering</h3>
-                <p className="text-white/80 text-sm mb-4">Master the future of technology</p>
-                <Link href="/programs/ai-engineering">
-                  <button className="text-white text-sm font-semibold flex items-center gap-1 hover:gap-2 transition-all">
-                    View Program <ArrowRight className="w-4 h-4" />
-                  </button>
-                </Link>
-              </motion.div>
-            </div>
-          </motion.div>
+          {/* Quick Stats - Simplified */}
+          <div className="mt-20 flex flex-wrap justify-center gap-8 text-center">
+            <StatBadge number="275+" label="Students Trained" />
+            <StatBadge number="87%" label="Success Rate" />
+            <StatBadge number="40+" label="Industry Partners" />
+            <StatBadge number="12" label="Countries" />
+          </div>
         </div>
       </div>
 
-      {/* Scroll Indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 1 }}
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
-      >
-        <div className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-2">
-          <motion.div
-            animate={{ y: [0, 12, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-1.5 h-1.5 bg-white rounded-full"
+      {/* Image Indicators */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+        {images.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentImage(idx)}
+            className={`w-2 h-2 rounded-full transition-all ${
+              currentImage === idx 
+                ? 'bg-lime-400 w-6' 
+                : 'bg-white/30 hover:bg-white/50'
+            }`}
+            aria-label={`Go to image ${idx + 1}`}
           />
-        </div>
-      </motion.div>
+        ))}
+      </div>
     </section>
+  )
+}
+
+/* Program Card Component */
+function ProgramCard({
+  icon,
+  title,
+  description,
+  features,
+  href,
+  accentColor,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  features: string[]
+  href: string
+  accentColor: 'lime' | 'emerald' | 'yellow'
+}) {
+  const colorClasses = {
+    lime: {
+      border: 'border-lime-500/20 hover:border-lime-500/40',
+      bg: 'bg-lime-500/5 hover:bg-lime-500/10',
+      text: 'text-lime-400',
+      icon: 'bg-lime-500/10 text-lime-400',
+    },
+    emerald: {
+      border: 'border-emerald-500/20 hover:border-emerald-500/40',
+      bg: 'bg-emerald-500/5 hover:bg-emerald-500/10',
+      text: 'text-emerald-400',
+      icon: 'bg-emerald-500/10 text-emerald-400',
+    },
+    yellow: {
+      border: 'border-yellow-500/20 hover:border-yellow-500/40',
+      bg: 'bg-yellow-500/5 hover:bg-yellow-500/10',
+      text: 'text-yellow-400',
+      icon: 'bg-yellow-500/10 text-yellow-400',
+    },
+  }
+
+  const colors = colorClasses[accentColor]
+
+  return (
+    <Link href={href}>
+      <div
+        className={`
+          group relative overflow-hidden rounded-2xl border backdrop-blur-sm
+          ${colors.border} ${colors.bg}
+          transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl
+          cursor-pointer h-full
+        `}
+      >
+        {/* Subtle linear overlay */}
+        <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+        <div className="relative p-8">
+          {/* Icon */}
+          <div className={`inline-flex p-3 rounded-xl ${colors.icon} mb-4`}>
+            {icon}
+          </div>
+
+          {/* Title */}
+          <h3 className="text-2xl font-bold text-white mb-3">{title}</h3>
+
+          {/* Description */}
+          <p className="text-gray-400 mb-6 leading-relaxed">{description}</p>
+
+          {/* Features */}
+          <ul className="space-y-2 mb-6">
+            {features.map((feature, idx) => (
+              <li key={idx} className="flex items-center gap-2 text-sm text-gray-300">
+                <div className={`w-1.5 h-1.5 rounded-full ${colors.text}`} />
+                {feature}
+              </li>
+            ))}
+          </ul>
+
+          {/* Learn More Link */}
+          <div className={`flex items-center gap-2 ${colors.text} font-semibold group-hover:gap-3 transition-all`}>
+            <span>Learn more</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/* Simplified Stat Badge */
+function StatBadge({ number, label }: { number: string; label: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-3xl md:text-4xl font-bold bg-linear-to-r from-lime-400 to-emerald-400 bg-clip-text text-transparent mb-1">
+        {number}
+      </div>
+      <div className="text-sm text-gray-400 font-medium">{label}</div>
+    </div>
   )
 }

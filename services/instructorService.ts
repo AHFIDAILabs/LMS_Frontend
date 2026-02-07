@@ -1,116 +1,205 @@
-import { ApiResponse } from '@/types';
-import { fetchWithAuth, handleResponse } from '../lib/utils';
+import { ApiResponse } from '@/types'
+import { axiosClient } from '@/lib/axiosClient'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+// =============================
+// Error helper (same pattern)
+// =============================
+const extractError = (err: any): string => {
+  const data = err?.response?.data
+  if (!data) return err.message || 'Request failed'
+
+  if (data.error) return data.error
+  if (data.message) return data.message
+
+  if (data.errors) {
+    if (Array.isArray(data.errors) && data.errors[0]?.msg) return data.errors[0].msg
+    if (typeof data.errors === 'object') {
+      const first = Object.values(data.errors)[0]
+      if (Array.isArray(first) && first[0]) return first[0] as string
+    }
+  }
+
+  return 'Something went wrong'
+}
 
 export const instructorService = {
   // =========================
   // PROFILE
   // =========================
   getProfile: async () => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/me`);
-    return handleResponse(res);
+    try {
+      const res = await axiosClient.get('/instructors/me')
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  updateProfile: async (data: FormData | {
-    firstName?: string;
-    lastName?: string;
-    phoneNumber?: string;
-    bio?: string;
-    linkedinProfile?: string;
-    deleteProfileImage?: boolean;
-  }) => {
-    const headers: any = {};
-    // Don't set Content-Type for FormData
-    if (!(data instanceof FormData)) headers['Content-Type'] = 'application/json';
-    const res = await fetchWithAuth(`${API_URL}/instructors/me`, {
-      method: 'PUT',
-      headers,
-      body: data instanceof FormData ? data : JSON.stringify(data),
-    });
-    return handleResponse(res);
+  updateProfile: async (
+    data:
+      | FormData
+      | {
+          firstName?: string
+          lastName?: string
+          phoneNumber?: string
+          bio?: string
+          linkedinProfile?: string
+          deleteProfileImage?: boolean
+        }
+  ) => {
+    try {
+      // Clean FormData to remove empty values
+      if (data instanceof FormData) {
+        const cleanedData = new FormData()
+        
+        for (const [key, value] of data.entries()) {
+          if (value instanceof File) {
+            cleanedData.append(key, value)
+          } else if (typeof value === 'string' && value.trim() !== '') {
+            cleanedData.append(key, value.trim())
+          } else if (typeof value !== 'string' && value !== null && value !== undefined) {
+            cleanedData.append(key, value)
+          }
+        }
+        
+        data = cleanedData
+      }
+
+      const res = await axiosClient.put('/instructors/me', data, {
+        headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+      })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   // =========================
   // COURSES
   // =========================
-
-
-  createCourse: async (data: {
-  title: string;
-  description: string;
-  programId: string; // ❗ required
-  modules?: Array<any>;
-  startDate?: Date | string;
-  endDate?: Date | string;
-}): Promise<ApiResponse<any>> => {
-  const res = await fetchWithAuth(`${API_URL}/instructor/courses`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-  return handleResponse(res);
+createCourse: async (
+  data: FormData | Record<string, any>
+): Promise<ApiResponse<any>> => {
+  try {
+    const res = await axiosClient.post(
+      '/instructors/create-courses',
+      data,
+      {
+        headers:
+          data instanceof FormData
+            ? { 'Content-Type': 'multipart/form-data' }
+            : {},
+      }
+    )
+    return res.data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
 },
 
-
-
-  getCourses: async (params?: { isPublished?: boolean; search?: string; page?: number; limit?: number }) => {
-    const query = new URLSearchParams(params as any).toString();
-    const res = await fetchWithAuth(`${API_URL}/instructors/courses?${query}`);
-    return handleResponse(res);
+  getCourses: async (params?: {
+    isPublished?: boolean
+    search?: string
+    page?: number
+    limit?: number
+  }) => {
+    try {
+      const res = await axiosClient.get('/instructors/courses', { params })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   getCourse: async (courseId: string) => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/courses/${courseId}`);
-    return handleResponse(res);
+    try {
+      const res = await axiosClient.get(`/instructors/courses/${courseId}`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   // =========================
   // STUDENTS
   // =========================
-  getStudents: async (params?: { courseId?: string; status?: string; page?: number; limit?: number }) => {
-    const query = new URLSearchParams(params as any).toString();
-    const res = await fetchWithAuth(`${API_URL}/instructors/students?${query}`);
-    return handleResponse(res);
+  getStudents: async (params?: {
+    courseId?: string
+    status?: string
+    page?: number
+    limit?: number
+  }) => {
+    try {
+      const res = await axiosClient.get('/instructors/students', { params })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   getStudentProgress: async (studentId: string, courseId: string) => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/students/${studentId}/courses/${courseId}/progress`);
-    return handleResponse(res);
+    try {
+      const res = await axiosClient.get(
+        `/instructors/students/${studentId}/courses/${courseId}/progress`
+      )
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   // =========================
   // ASSESSMENTS & SUBMISSIONS
   // =========================
-  getPendingSubmissions: async (params?: { courseId?: string; page?: number; limit?: number }) => {
-    const query = new URLSearchParams(params as any).toString();
-    const res = await fetchWithAuth(`${API_URL}/instructors/submissions/pending?${query}`);
-    return handleResponse(res);
+  getPendingSubmissions: async (params?: {
+    courseId?: string
+    page?: number
+    limit?: number
+  }) => {
+    try {
+      const res = await axiosClient.get('/instructors/submissions/pending', { params })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   gradeSubmission: async (submissionId: string, score: number, feedback?: string) => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/submissions/${submissionId}/grade`, {
-      method: 'PUT',
-      body: JSON.stringify({ score, feedback }),
-    });
-    return handleResponse(res);
+    try {
+      const res = await axiosClient.put(
+        `/instructors/submissions/${submissionId}/grade`,
+        { score, feedback }
+      )
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   // =========================
   // ANNOUNCEMENTS
   // =========================
   sendAnnouncement: async (courseId: string, title: string, message: string) => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/courses/${courseId}/announcements`, {
-      method: 'POST',
-      body: JSON.stringify({ title, message }),
-    });
-    return handleResponse(res);
+    try {
+      const res = await axiosClient.post(
+        `/instructors/courses/${courseId}/announcements`,
+        { title, message }
+      )
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   // =========================
   // DASHBOARD
   // =========================
   getDashboardStats: async () => {
-    const res = await fetchWithAuth(`${API_URL}/instructors/dashboard/stats`);
-    return handleResponse(res);
-  }
-};
+    try {
+      const res = await axiosClient.get('/instructors/dashboard/stats')
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
+  },
+}

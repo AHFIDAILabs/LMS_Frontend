@@ -1,107 +1,345 @@
 // ============================================
 // services/enrollmentService.ts
 // ============================================
+import { axiosClient } from '@/lib/axiosClient'
 
-import { handleResponse, fetchWithAuth } from '../lib/utils';
+export interface EnrollmentParams {
+  status?: string
+  programId?: string
+  cohort?: string
+  page?: number
+  limit?: number
+}
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+export interface EnrollStudentData {
+  studentId: string
+  programId: string
+  cohort?: string
+  notes?: string
+}
+
+export interface SelfEnrollData {
+  scholarshipCode?: string
+  paymentMethod?: string
+}
+
+export interface ValidateScholarshipData {
+  code: string
+  programId: string
+}
+
+export interface UpdateEnrollmentData {
+  status?: string
+  completionDate?: string
+  dropDate?: string
+  notes?: string
+}
+
+export interface UpdateCourseProgressData {
+  status?: string
+  lessonsCompleted?: number
+  completionDate?: string
+}
 
 export const enrollmentService = {
   // =====================================================
-  // STUDENT
+  // STUDENT ENDPOINTS
   // =====================================================
 
-  // Get logged-in student's enrollments
+  /**
+   * Get logged-in student's enrollments
+   */
   getMyEnrollments: async () => {
-    const response = await fetchWithAuth(`${API_URL}/enrollments/me`);
-    return handleResponse(response);
-  },
-
-  // Self-enroll in a program (if route exists)
-  selfEnroll: async (programId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/programs/${programId}/enroll`, {
-      method: 'POST',
-    });
-    return handleResponse(response);
-  },
-
-  // =====================================================
-  // ADMIN
-  // =====================================================
-
-  // Enroll a student into a program
-  enrollStudent: async (data: {
-    studentId: string;
-    programId: string;
-    cohort?: string;
-    notes?: string;
-  }) => {
-    const response = await fetchWithAuth(`${API_URL}/enrollments`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
-
-  // Get all enrollments (admin)
-  getAllEnrollments: async (params?: {
-    status?: string;
-    programId?: string;
-    cohort?: string;
-    page?: number;
-    limit?: number;
-  }) => {
-    const query = new URLSearchParams(params as any).toString();
-    const response = await fetchWithAuth(`${API_URL}/enrollments?${query}`);
-    return handleResponse(response);
-  },
-
-  // Update enrollment status
-  updateEnrollmentStatus: async (
-    enrollmentId: string,
-    data: {
-      status?: string;
-      completionDate?: string;
-      dropDate?: string;
-      notes?: string;
+    try {
+      const response = await axiosClient.get('/enrollments/me')
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
     }
+  },
+
+  /**
+   * Self-enroll in a program
+   */
+selfEnroll: async (programId: string, data?: SelfEnrollData) => {
+    try {
+      const response = await axiosClient.post(`/programs/${programId}/enroll`, data || {})
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+
+  /**
+   * Validate scholarship code before enrollment
+   */
+  validateScholarship: async (data: ValidateScholarshipData) => {
+    try {
+      const response = await axiosClient.post('/enrollments/validate-scholarship', data)
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  // =====================================================
+  // ADMIN ENDPOINTS
+  // =====================================================
+
+  /**
+   * Enroll a student into a program (Admin)
+   */
+  enrollStudent: async (data: EnrollStudentData) => {
+    try {
+      const response = await axiosClient.post('/enrollments', data)
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  /**
+   * Get all enrollments with filters (Admin)
+   */
+  getAllEnrollments: async (params?: EnrollmentParams) => {
+    try {
+      const response = await axiosClient.get('/enrollments', { params })
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+        total: response.data.total,
+        page: response.data.page,
+        pages: response.data.pages,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  /**
+   * Get single enrollment by ID
+   */
+  getEnrollmentById: async (enrollmentId: string) => {
+    try {
+      const response = await axiosClient.get(`/enrollments/${enrollmentId}`)
+      return {
+        success: true,
+        data: response.data.data,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  /**
+   * Update enrollment status (Admin)
+   */
+ updateEnrollmentStatus: async (
+    enrollmentId: string,
+    data: UpdateEnrollmentData
   ) => {
-    const response = await fetchWithAuth(`${API_URL}/enrollments/${enrollmentId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    try {
+      const response = await axiosClient.put(`/enrollments/${enrollmentId}`, data)
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
   },
 
-  getEnrollmentById: async (id: string) => {
-  const response = await fetchWithAuth(`${API_URL}/enrollments/${id}`);
-  return handleResponse(response);
-},
 
-updateCourseProgress: async (
-  enrollmentId: string,
-  courseId: string,
-  data: { status?: string; lessonsCompleted?: number; completionDate?: string }
-) => {
-  const response = await fetchWithAuth(
-    `${API_URL}/enrollments/${enrollmentId}/course/${courseId}`,
-    { method: 'PUT', body: JSON.stringify(data) }
-  );
-  return handleResponse(response);
-},
+  /**
+   * Update course progress within enrollment
+   */
+ updateCourseProgress: async (
+    enrollmentId: string,
+    courseId: string,
+    data: UpdateCourseProgressData
+  ) => {
+    try {
+      const response = await axiosClient.put(
+        `/enrollments/${enrollmentId}/course/${courseId}`,
+        data
+      )
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
 
-getEnrollmentStats: async (programId?: string) => {
-  const query = programId ? `?programId=${programId}` : '';
-  const response = await fetchWithAuth(`${API_URL}/enrollments/stats/overview${query}`);
-  return handleResponse(response);
-},
+  /**
+   * Get enrollment statistics
+   */
+  getEnrollmentStats: async (programId?: string) => {
+    try {
+      const params = programId ? { programId } : {}
+      const response = await axiosClient.get('/enrollments/stats/overview', { params })
+      return {
+        success: true,
+        data: response.data.data,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
 
 
-  // Delete enrollment
+   /**
+   * Bulk enroll students in a program (Admin)
+   */
+  bulkEnrollStudents: async (data: {
+    studentIds: string[]
+    programId: string
+    cohort?: string
+    notes?: string
+  }) => {
+    try {
+      const response = await axiosClient.post('/enrollments/bulk', data)
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  /**
+   * Get available students for enrollment
+   */
+  getAvailableStudents: async (params?: {
+    programId?: string
+    search?: string
+    limit?: number
+  }) => {
+    try {
+      const response = await axiosClient.get('/enrollments/available-students', { params })
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+   /**
+   * Bulk enroll by email (creates users if they don't exist)
+   */
+  bulkEnrollByEmail: async (data: {
+    emails: Array<string | {
+      email: string
+      firstName?: string
+      lastName?: string
+      cohort?: string
+    }>
+    programId: string
+    cohort?: string
+    notes?: string
+    createUsers?: boolean
+  }) => {
+    try {
+      const response = await axiosClient.post('/enrollments/bulk-email', data)
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+      }
+    }
+  },
+
+  /**
+   * Delete enrollment (Admin)
+   */
   deleteEnrollment: async (enrollmentId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/enrollments/${enrollmentId}`, {
-      method: 'DELETE',
-    });
-    return handleResponse(response);
+    try {
+      const response = await axiosClient.delete(`/enrollments/${enrollmentId}`)
+      return {
+        success: true,
+        message: response.data.message,
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+      }
+    }
   },
-};
+}

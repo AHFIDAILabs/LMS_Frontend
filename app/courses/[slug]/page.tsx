@@ -69,6 +69,8 @@ export default function CourseDetailPage() {
   const [courseData, setCourseData] = useState<CourseData | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'curriculum' | 'instructor'>('overview')
 
+  
+
   useEffect(() => {
     const fetchCourse = async () => {
       try {
@@ -117,6 +119,8 @@ export default function CourseDetailPage() {
   }
 
   const { course, modules, stats } = courseData
+  const instructor = course.createdBy
+
 
   return (
     <main className="min-h-screen bg-[#2A434E] text-white">
@@ -322,21 +326,26 @@ export default function CourseDetailPage() {
                   </div>
                 )}
 
-                {/* Instructor */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-                  <h3 className="text-xl font-bold mb-4">Instructor</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-linear-to-br from-[#FF6B35] to-[#FF8C35] rounded-full flex items-center justify-center text-2xl font-bold">
-                      {course.createdBy.firstName[0]}{course.createdBy.lastName[0]}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-lg">
-                        {course.createdBy.firstName} {course.createdBy.lastName}
-                      </p>
-                      <p className="text-sm text-gray-400">Course Instructor</p>
-                    </div>
-                  </div>
-                </div>
+          {/* Instructor */}
+<div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
+  <h3 className="text-xl font-bold mb-4">Instructor</h3>
+  <div className="flex items-center gap-4">
+    <div className="w-16 h-16 bg-linear-to-br from-[#FF6B35] to-[#FF8C35] rounded-full flex items-center justify-center text-2xl font-bold">
+      {course.createdBy?.firstName?.[0] || '?'}
+      {course.createdBy?.lastName?.[0] || '?'}
+    </div>
+    <div>
+      <p className="font-semibold text-lg">
+        {course.createdBy?.firstName || 'Unknown'} {course.createdBy?.lastName || ''}
+      </p>
+      <p className="text-sm text-gray-400">Course Instructor</p>
+      {course.createdBy?.email && (
+        <p className="text-sm text-gray-500">{course.createdBy.email}</p>
+      )}
+    </div>
+  </div>
+</div>
+
 
                 {/* Course Stats */}
                 <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
@@ -431,11 +440,12 @@ export default function CourseDetailPage() {
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
                 <div className="flex items-center gap-6 mb-6">
                   <div className="w-24 h-24 bg-linear-to-br from-[#FF6B35] to-[#FF8C35] rounded-full flex items-center justify-center text-3xl font-bold">
-                    {course.createdBy.firstName[0]}{course.createdBy.lastName[0]}
+                    {course.createdBy?.firstName?.[0] || '?'}
+                    {course.createdBy?.lastName?.[0] || '?'}
                   </div>
                   <div>
                     <h2 className="text-3xl font-bold mb-2">
-                      {course.createdBy.firstName} {course.createdBy.lastName}
+                      {course.createdBy?.firstName || 'Unknown'} {course.createdBy?.lastName || ''}
                     </h2>
                     <p className="text-gray-400">Course Instructor</p>
                   </div>
@@ -444,7 +454,9 @@ export default function CourseDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-xl font-bold mb-2">Contact</h3>
-                    <p className="text-gray-300">{course.createdBy.email}</p>
+                    <p className="text-gray-300">
+                      {course.createdBy?.email || 'No contact information available'}
+                    </p>
                   </div>
                   
                   <div>
@@ -472,7 +484,7 @@ export default function CourseDetailPage() {
             className="inline-flex items-center gap-3 px-8 py-4 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-xl font-semibold text-lg transition-all duration-300 group"
           >
             <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            Enroll Now
+            Contact Us Now
             <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>

@@ -1,351 +1,280 @@
 'use client'
 
+import { useParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Navbar } from '@/components/layout/NavBar'
 import { Footer } from '@/components/layout/Footer'
-import { useParams } from 'next/navigation'
-import { useProgramBySlug } from '@/hooks/useProgram'
-import { motion } from 'framer-motion'
-import { Clock, BookOpen, Users, Award, CheckCircle, ArrowRight, Calendar } from 'lucide-react'
+import { Loader2, Users, BookOpen, Target, CheckCircle2, Award, GraduationCap, ArrowRight, Play, Lock } from 'lucide-react'
+import { programService } from '@/services/programService'
+import { enrollmentService } from '@/services/enrollmentService'
+import { Program } from '@/types'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { EnrollmentModal } from '@/components/modals/EnrollmentModal'
 
 export default function ProgramDetailPage() {
   const params = useParams()
-  const [slug, setSlug] = useState<string | null>(null)
+  const slug = params.slug as string
+
+  const [program, setProgram] = useState<Program | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isEnrolled, setIsEnrolled] = useState(false)
+  const [checkingEnrollment, setCheckingEnrollment] = useState(true)
+  const [showEnrollmentModal, setShowEnrollmentModal] = useState(false)
+
+  // Check if user is enrolled in this program
+  useEffect(() => {
+    const checkEnrollment = async () => {
+      if (!program) return
+      
+      setCheckingEnrollment(true)
+      const enrollmentsRes = await enrollmentService.getMyEnrollments()
+      
+      if (enrollmentsRes.success && enrollmentsRes.data) {
+        const enrolled = enrollmentsRes.data.some(
+          (enrollment: any) => enrollment.program._id === program._id
+        )
+        setIsEnrolled(enrolled)
+      }
+      setCheckingEnrollment(false)
+    }
+
+    checkEnrollment()
+  }, [program])
 
   useEffect(() => {
-    console.log('===== PROGRAM DETAIL PAGE =====')
-    console.log('Full params:', params)
-    console.log('params.slug:', params?.slug)
-    
-    if (params?.slug) {
-      const extractedSlug = Array.isArray(params.slug) ? params.slug[0] : params.slug
-      console.log('Extracted slug:', extractedSlug)
-      setSlug(extractedSlug)
+    const fetchProgram = async () => {
+      if (!slug) return
+      setLoading(true)
+      const res = await programService.getProgramBySlug(slug)
+      if (res.success && res.data) {
+        setProgram(res.data)
+        setError(null)
+      } else {
+        setProgram(null)
+        setError(res.error || 'Program not found')
+      }
+      setLoading(false)
     }
-    console.log('================================')
-  }, [params])
+    fetchProgram()
+  }, [slug])
 
-  // Use the slug hook to fetch program data
-  const { program, loading, error } = useProgramBySlug(slug || "")
-  
-  useEffect(() => {
-    if (program) {
-      console.log('✅ Program loaded:', program.title)
-    }
-    if (error) {
-      console.error('❌ Error loading program:', error)
-    }
-  }, [program, error])
-
-  // Early return if no slug yet
-  if (!slug) {
-    console.log('⏳ Waiting for slug...')
-    return null
+  const handleEnrollClick = () => {
+    setShowEnrollmentModal(true)
   }
 
-  // Loading state
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#2A434E]">
-        <Navbar />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="inline-block w-12 h-12 border-4 border-[#FF6B35] border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-white mt-4">Loading program...</p>
-          </div>
-        </div>
+      <main className="min-h-screen bg-[#2A434E] text-white flex items-center justify-center">
+        <Loader2 className="w-12 h-12 animate-spin text-[#FF6B35]" />
       </main>
     )
   }
 
-  // Error or not found state
   if (error || !program) {
     return (
-      <main className="min-h-screen bg-[#2A434E]">
-        <Navbar />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center max-w-md px-4">
-            <div className="mb-4">
-              <svg className="w-16 h-16 text-red-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-red-400 text-xl mb-2">Program Not Found</p>
-            <p className="text-gray-400 mb-6">{error || `No program found with slug: ${slug}`}</p>
-            <Link href="/allPrograms">
-              <button className="px-6 py-3 bg-[#FF6B35] text-white rounded-full hover:bg-[#f85a28] transition-colors">
-                Back to Programs
-              </button>
-            </Link>
-          </div>
-        </div>
+      <main className="min-h-screen bg-[#2A434E] text-white flex flex-col items-center justify-center px-4">
+        <h2 className="text-3xl font-bold mb-4">Program Not Found</h2>
+        <p className="text-gray-400 mb-6">{error}</p>
+        <Link href="/allPrograms" className="px-6 py-3 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-lg transition">
+          Back to Programs
+        </Link>
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#2A434E]">
+    <main className="min-h-screen bg-[#2A434E] text-white">
       <Navbar />
 
-      {/* Hero Section - ✅ FIXED: bg-linear-to-b → bg-gradient-to-b */}
-      <section className="relative pt-24 pb-12 px-4 bg-gradient-to-b from-[#1f3238] to-[#2A434E]">
-        <div className="max-w-7xl mx-auto">
+      {/* Hero Section */}
+      <section className="relative px-4 py-20 overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-br from-[#FF6B35]/10 to-transparent"></div>
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Content */}
+            {/* Left */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.5 }}
             >
-              {program.category && (
-                <div className="inline-block bg-[#FF6B35]/20 text-[#FF6B35] px-4 py-2 rounded-full text-sm font-semibold mb-4">
-                  {program.category}
+              <h1 className="text-5xl font-bold mb-6">{program.title}</h1>
+              <p className="text-xl text-gray-300 mb-8 leading-relaxed">{program.description}</p>
+
+              {/* Enrollment Status Badge */}
+              {checkingEnrollment ? (
+                <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-lg">
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  <span className="text-sm text-gray-400">Checking enrollment status...</span>
+                </div>
+              ) : isEnrolled ? (
+                <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-sm text-green-500 font-semibold">You're enrolled in this program</span>
+                </div>
+              ) : (
+                <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <Lock className="w-5 h-5 text-yellow-500" />
+                  <span className="text-sm text-yellow-500 font-semibold">Not enrolled yet</span>
                 </div>
               )}
-              
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-                {program.title}
-              </h1>
-              
-              <p className="text-xl text-gray-300 mb-8">
-                {program.description}
-              </p>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {program.estimatedHours && (
-                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                    <Clock className="w-5 h-5 text-[#FF6B35] mb-2" />
-                    <div className="text-2xl font-bold text-white">{program.estimatedHours}h</div>
-                    <div className="text-xs text-gray-400">Total Duration</div>
-                  </div>
-                )}
+              {/* CTA */}
+              <div className="flex flex-wrap gap-4">
+                {(
+                  <Link
+                    href={`/students/myProgram/${program._id}/learn`}
+                    className="px-8 py-4 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 group"
+                  >
+                    <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    Continue Learning
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                ) }
                 
-                {program.courses && Array.isArray(program.courses) && (
-                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                    <BookOpen className="w-5 h-5 text-[#FF6B35] mb-2" />
-                    <div className="text-2xl font-bold text-white">{program.courses.length}</div>
-                    <div className="text-xs text-gray-400">Courses</div>
-                  </div>
+                {!isEnrolled && (
+                  <Link
+                    href="/allPrograms"
+                    className="px-8 py-4 border border-white/20 hover:bg-white/5 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2"
+                  >
+                    Browse Other Programs
+                  </Link>
                 )}
-                
-                {program.instructors && Array.isArray(program.instructors) && (
-                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                    <Users className="w-5 h-5 text-[#FF6B35] mb-2" />
-                    <div className="text-2xl font-bold text-white">{program.instructors.length}</div>
-                    <div className="text-xs text-gray-400">Instructors</div>
-                  </div>
-                )}
-                
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                  <Award className="w-5 h-5 text-[#FF6B35] mb-2" />
-                  <div className="text-2xl font-bold text-white">✓</div>
-                  <div className="text-xs text-gray-400">Certificate</div>
-                </div>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="px-8 py-4 bg-[#FF6B35] text-white rounded-full font-semibold hover:bg-[#f85a28] transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B35]/50">
-                  Enroll Now
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-                <button className="px-8 py-4 border-2 border-white/30 text-white rounded-full font-semibold hover:bg-white/10 transition-all duration-300">
-                  Download Syllabus
-                </button>
               </div>
             </motion.div>
 
-            {/* Right Content - Image/Card - ✅ FIXED: bg-linear-to-br → bg-gradient-to-br */}
+            {/* Right */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
               className="relative"
             >
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-                {program.bannerImage || program.coverImage ? (
-                  <img 
-                    src={program.bannerImage || program.coverImage} 
+              <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white/10 shadow-2xl">
+                {program.coverImage ? (
+                  <img
+                    src={program.coverImage}
                     alt={program.title}
-                    className="w-full h-64 object-cover rounded-xl mb-6"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-64 bg-gradient-to-br from-[#FF6B35]/20 to-[#2A434E] rounded-xl mb-6 flex items-center justify-center">
-                    <BookOpen className="w-24 h-24 text-[#FF6B35]/50" />
+                  <div className="w-full h-full bg-linear-to-br from-[#FF6B35]/20 to-[#2A434E] flex items-center justify-center">
+                    <GraduationCap className="w-32 h-32 text-white/20" />
                   </div>
                 )}
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-white/10">
-                    <span className="text-gray-400">Program Fee</span>
-                    <span className="text-3xl font-bold text-white">
-                      {program.price && program.price > 0 
-                        ? `${program.currency === 'NGN' ? '₦' : '$'}${program.price.toLocaleString()}`
-                        : 'Free'
-                      }
-                    </span>
-                  </div>
-
-                  {program.isSelfPaced && (
-                    <div className="flex items-center gap-2 text-gray-300">
-                      <CheckCircle className="w-5 h-5 text-[#FF6B35]" />
-                      <span>Self-paced learning</span>
-                    </div>
-                  )}
-
-                  {program.startDate && (
-                    <div className="flex items-center gap-2 text-gray-300">
-                      <Calendar className="w-5 h-5 text-[#FF6B35]" />
-                      <span>Starts {new Date(program.startDate).toLocaleDateString()}</span>
-                    </div>
-                  )}
-
-                  {program.certificateTemplate && (
-                    <div className="flex items-center gap-2 text-gray-300">
-                      <Award className="w-5 h-5 text-[#FF6B35]" />
-                      <span>Certificate upon completion</span>
-                    </div>
-                  )}
-                </div>
               </div>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Program Overview */}
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* Target Audience */}
-              {program.targetAudience && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-3xl font-bold text-white mb-4">Who This Program Is For</h2>
-                  <p className="text-gray-300">{program.targetAudience}</p>
+      {/* Program Details */}
+      <section className="px-4 py-16">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            {program.objectives && program.objectives.length > 0 && (
+              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
+                <h2 className="text-2xl font-bold mb-4">What You'll Learn</h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {program.objectives.map((obj, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-[#FF6B35] mt-1 shrink-0" />
+                      <p className="text-gray-300">{obj}</p>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
+          </div>
 
-              {/* Prerequisites */}
-              {program.prerequisites && program.prerequisites.length > 0 && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-3xl font-bold text-white mb-4">Prerequisites</h2>
-                  <ul className="space-y-2">
-                    {program.prerequisites.map((prereq, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-gray-300">
-                        <CheckCircle className="w-5 h-5 text-[#FF6B35] mt-0.5 flex-shrink-0" />
-                        <span>{prereq}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Courses in Program */}
-              {program.courses && Array.isArray(program.courses) && program.courses.length > 0 && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-3xl font-bold text-white mb-6">Courses in This Program</h2>
-                  <div className="space-y-4">
-                    {program.courses.map((course: any, idx: number) => (
-                      <Link key={course._id || idx} href={`/courses/${course.slug || course._id}`}>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6 hover:border-[#FF6B35]/50 transition-all duration-300 group">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="text-sm text-gray-400 mb-2">Course {idx + 1}</div>
-                              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-[#FF6B35] transition-colors">
-                                {course.title}
-                              </h3>
-                              <p className="text-gray-300 mb-4">{course.description}</p>
-                              <div className="flex items-center gap-4 text-sm text-gray-400">
-                                {course.totalDuration && (
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-4 h-4" />
-                                    <span>{course.totalDuration}h</span>
-                                  </div>
-                                )}
-                                {course.level && (
-                                  <div className="px-2 py-1 bg-white/5 rounded text-xs">
-                                    {course.level}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-[#FF6B35] opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Sidebar */}
+          <div className="space-y-6">
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="w-6 h-6 text-[#FF6B35]" />
+                <h3 className="text-xl font-bold">Target Audience</h3>
+              </div>
+              <p className="text-gray-300">{program.targetAudience || 'Not specified'}</p>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Instructors */}
-              {program.instructors && Array.isArray(program.instructors) && program.instructors.length > 0 && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-                  <h3 className="text-xl font-bold text-white mb-4">Your Instructors</h3>
-                  <div className="space-y-4">
-                    {program.instructors.map((instructor: any) => (
-                      <div key={instructor._id || instructor.id} className="flex items-center gap-3">
-                        {instructor.avatar ? (
-                          <img 
-                            src={instructor.avatar} 
-                            alt={instructor.name || `${instructor.firstName} ${instructor.lastName}`}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-[#FF6B35]/20 flex items-center justify-center text-[#FF6B35] font-bold">
-                            {(instructor.name || instructor.firstName || 'I')[0]}
-                          </div>
-                        )}
-                        <div>
-                          <div className="text-white font-semibold">
-                            {instructor.name || `${instructor.firstName} ${instructor.lastName}`}
-                          </div>
-                          <div className="text-sm text-gray-400">Instructor</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Course Stats */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
+              <h3 className="text-xl font-bold mb-4">Program Details</h3>
+              <div className="space-y-3">
+                {/* <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Price</span>
+                  <span className="font-semibold text-[#FF6B35]">
+                    {program.price === 0 ? 'Free' : `${program.currency === 'NGN' ? '₦' : '$'}${program.price?.toLocaleString()}`}
+                  </span>
+                </div> */}
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Duration</span>
+                  <span className="font-semibold">{program.estimatedHours || 'Self-paced'}</span>
                 </div>
-              )}
-
-              {/* Tags */}
-              {program.tags && program.tags.length > 0 && (
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
-                  <h3 className="text-xl font-bold text-white mb-4">Skills You'll Gain</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {program.tags.map((tag, idx) => (
-                      <span 
-                        key={idx}
-                        className="px-3 py-1 bg-white/5 border border-white/10 text-gray-300 rounded-full text-sm"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Courses</span>
+                  <span className="font-semibold">{program.courses?.length || 0} Courses</span>
                 </div>
-              )}
-
-              {/* Enroll CTA - ✅ FIXED: bg-linear-to-br → bg-gradient-to-br */}
-              <div className="bg-gradient-to-br from-[#FF6B35] to-[#f85a28] rounded-2xl p-6 shadow-lg shadow-[#FF6B35]/20">
-                <h3 className="text-2xl font-bold text-white mb-2">Ready to Start?</h3>
-                <p className="text-white/90 mb-4">Enroll now and begin your learning journey</p>
-                <button className="w-full px-6 py-3 bg-white text-[#FF6B35] rounded-full font-semibold hover:bg-gray-100 transition-colors">
-                  Enroll Now
-                </button>
               </div>
             </div>
+
+            {/* Scholarship Notice */}
+            {!isEnrolled && (
+              <div className="bg-linear-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm border border-purple-500/30 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <Award className="w-6 h-6 text-purple-400" />
+                  <h3 className="text-xl font-bold text-purple-300">Scholarship Available</h3>
+                </div>
+                <p className="text-gray-300 text-sm mb-4">
+                  Have a scholarship code? You can get 100% free access to this program during enrollment.
+                </p>
+                <button
+                  onClick={handleEnrollClick}
+                  className="w-full px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 rounded-lg text-purple-300 font-semibold transition-all duration-300"
+                >
+                  Apply Scholarship Code
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
+      {/* CTA */}
+      {!isEnrolled && (
+        <section className="px-4 py-16 bg-linear-to-br from-[#FF6B35]/10 to-transparent text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl font-bold mb-6">Ready to Start Learning?</h2>
+            <p className="text-gray-300 mb-8 text-lg">
+              Join thousands of students and start your learning journey today
+            </p>
+            <button
+              onClick={handleEnrollClick}
+              disabled={checkingEnrollment}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-xl font-semibold text-lg transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              Start Learning Now
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+        </section>
+      )}
+
       <Footer />
+
+      {/* Enrollment Modal */}
+      <EnrollmentModal
+        isOpen={showEnrollmentModal}
+        onClose={() => setShowEnrollmentModal(false)}
+        program={{
+          _id: program._id,
+          title: program.title,
+          price: program.price || 0,
+          currency: program.currency || 'USD'
+        }}
+      />
     </main>
   )
 }

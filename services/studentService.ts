@@ -2,103 +2,271 @@
 // services/studentService.ts
 // ============================================
 
-import { fetchWithAuth, handleResponse } from '../lib/utils';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { axiosClient } from '@/lib/axiosClient';
+import { ApiResponse } from '@/types';
 
 export const studentService = {
   // =====================================================
   // DASHBOARD
   // =====================================================
-  getDashboardOverview: async () => {
-    const response = await fetchWithAuth(`${API_URL}/student/dashboard`);
-    return handleResponse(response);
+  getDashboardOverview: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get('/students/dashboard');
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch dashboard overview',
+        data: null as any,
+      };
+    }
   },
 
   // =====================================================
   // PROGRAMS & COURSES
   // =====================================================
-  getEnrolledPrograms: async () => {
-    const response = await fetchWithAuth(`${API_URL}/student/programs`);
-    return handleResponse(response);
+  getEnrolledPrograms: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const response = await axiosClient.get('/students/programs');
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch enrolled programs',
+        data: [],
+      };
+    }
   },
 
-  getEnrolledCourses: async () => {
-    const response = await fetchWithAuth(`${API_URL}/student/courses`);
-    return handleResponse(response);
+  getEnrolledCourses: async (): Promise<ApiResponse<any[]>> => {
+    try {
+      const response = await axiosClient.get('/students/courses');
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch enrolled courses',
+        data: [],
+      };
+    }
   },
 
-  getProgramCourses: async (programId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/student/program/${programId}/courses`);
-    return handleResponse(response);
+  getProgramCourses: async (programId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get(`/students/program/${programId}/courses`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch program courses',
+        data: null as any,
+      };
+    }
   },
 
-  getCourseModules: async (courseId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/student/course/${courseId}/modules`);
-    return handleResponse(response);
+  getCourseModules: async (courseId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get(`/students/course/${courseId}/modules`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch course modules',
+        data: null as any,
+      };
+    }
   },
 
-  getModuleLessons: async (moduleId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/student/module/${moduleId}/lessons`);
-    return handleResponse(response);
+  getModuleLessons: async (moduleId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get(`/students/module/${moduleId}/lessons`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch module lessons',
+        data: null as any,
+      };
+    }
   },
 
-  getLessonDetails: async (lessonId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/student/lesson/${lessonId}`);
-    return handleResponse(response);
+  getLessonDetails: async (lessonId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get(`/students/lesson/${lessonId}`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch lesson details',
+        data: null as any,
+      };
+    }
   },
 
-  getCourseProgress: async (courseId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/student/course/${courseId}/progress`);
-    return handleResponse(response);
+  getCourseProgress: async (courseId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get(`/students/course/${courseId}/progress`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch course progress',
+        data: null as any,
+      };
+    }
   },
 
   // =====================================================
   // NOTIFICATIONS
   // =====================================================
-  getNotifications: async (page = 1, limit = 20, unreadOnly = false) => {
-    const response = await fetchWithAuth(
-      `${API_URL}/student/notifications?page=${page}&limit=${limit}&unreadOnly=${unreadOnly}`
-    );
-    return handleResponse(response);
+  getNotifications: async (params?: {
+    page?: number;
+    limit?: number;
+    unreadOnly?: boolean;
+  }): Promise<ApiResponse<any[]>> => {
+    try {
+      const response = await axiosClient.get('/students/notifications', { params });
+      return {
+        success: true,
+        data: response.data.data,
+        count: response.data.count,
+        total: response.data.total,
+        page: response.data.page,
+        pages: response.data.pages,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch notifications',
+        data: [],
+      };
+    }
   },
 
-  markNotificationRead: async (notificationId: string) => {
-    const response = await fetchWithAuth(
-      `${API_URL}/student/notifications/${notificationId}/read`,
-      { method: 'PATCH' }
-    );
-    return handleResponse(response);
+  markNotificationRead: async (notificationId: string): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.patch(`/students/notifications/${notificationId}/read`);
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to mark notification as read',
+        data: null as any,
+      };
+    }
   },
 
-  markAllNotificationsRead: async () => {
-    const response = await fetchWithAuth(`${API_URL}/student/notifications/read-all`, {
-      method: 'PATCH'
-    });
-    return handleResponse(response);
+  markAllNotificationsRead: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.patch('/students/notifications/read-all');
+      return {
+        success: true,
+        data: response.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to mark all notifications as read',
+        data: null as any,
+      };
+    }
   },
 
-  deleteNotification: async (notificationId: string) => {
-    const response = await fetchWithAuth(
-      `${API_URL}/student/notifications/${notificationId}`,
-      { method: 'DELETE' }
-    );
-    return handleResponse(response);
+  deleteNotification: async (notificationId: string): Promise<ApiResponse<null>> => {
+    try {
+      const response = await axiosClient.delete(`/students/notifications/${notificationId}`);
+      return {
+        success: true,
+        data: null,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to delete notification',
+        data: null,
+      };
+    }
   },
 
   // =====================================================
-  // RECENT ACTIVITY
+  // RECENT ACTIVITY & STATISTICS
   // =====================================================
-  getRecentActivity: async (limit = 10) => {
-    const response = await fetchWithAuth(`${API_URL}/student/recent-activity?limit=${limit}`);
-    return handleResponse(response);
+  getRecentActivity: async (limit = 10): Promise<ApiResponse<any[]>> => {
+    try {
+      const response = await axiosClient.get('/students/recent-activity', {
+        params: { limit }
+      });
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch recent activity',
+        data: [],
+      };
+    }
   },
 
-  // =====================================================
-  // LEARNING STATISTICS
-  // =====================================================
-  getLearningStatistics: async (timeframe = 30) => {
-    const response = await fetchWithAuth(`${API_URL}/student/statistics?timeframe=${timeframe}`);
-    return handleResponse(response);
+  getLearningStatistics: async (timeframe = 30): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axiosClient.get('/students/statistics', {
+        params: { timeframe }
+      });
+      return {
+        success: true,
+        data: response.data.data,
+        error: undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch learning statistics',
+        data: null as any,
+      };
+    }
   },
 };

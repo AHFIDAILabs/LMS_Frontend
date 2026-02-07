@@ -1,399 +1,267 @@
-// ============================================
-// services/authService.ts
-// ============================================
+import { UserProfileResponse } from '@/types'
+import { axiosClient } from '@/lib/axiosClient'
 
-import { getAuthToken, handleResponse, fetchWithAuth } from '../lib/utils';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
-// ============================================
-// Types
-// ============================================
 interface AuthResponse {
-  success: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  user?: any;
-  error?: string;
-  message?: string;
-  errors?: any;
-  [key: string]: any;
+  success: boolean
+  accessToken?: string
+  refreshToken?: string
+  user?: any
+  data?: any
+  message?: string
+  error?: string
+  errors?: any
 }
 
 interface ServiceResponse {
-  success: boolean;
-  token?: string;
-  refreshToken?: string;
-  data?: any;
-  error?: string;
-  message?: string;
+  success: boolean
+  token?: string
+  refreshToken?: string
+  data?: any
+  message?: string
 }
 
-// ============================================
+// =============================
 // Helpers
-// ============================================
+// =============================
+const extractError = (err: any): string => {
+  const data = err?.response?.data
+  if (!data) return err.message || 'Request failed'
 
-/**
- * Read the response body exactly once as text, then attempt
- * JSON.parse.  Keeps the raw string as a fallback so nothing
- * is ever lost and we never hit the "body already consumed" error.
- */
-async function readBody(res: Response): Promise<{ raw: string; json: any }> {
-  const raw = await res.text();
-  let json: any = null;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    // not valid JSON — json stays null
-  }
-  return { raw, json };
-}
+  if (data.error) return data.error
+  if (data.message) return data.message
 
-/**
- * Walk the parsed body in priority order and return the most
- * useful error string.  Covers every shape your backend sends:
- *   { success: false, error: "..." }
- *   { success: false, message: "..." }
- *   { errors: [{ msg: "..." }] }          ← express-validator array
- *   { errors: { field: ["..."] } }        ← express-validator object
- * Falls back to raw text, then HTTP status.
- */
-function extractError(json: any, raw: string, status: number): string {
-  if (json) {
-    if (typeof json.error === 'string' && json.error) return json.error;
-    if (typeof json.message === 'string' && json.message) return json.message;
-
-    if (json.errors) {
-      // express-validator array shape
-      if (Array.isArray(json.errors) && json.errors[0]?.msg) {
-        return json.errors[0].msg;
-      }
-      // express-validator object shape
-      if (typeof json.errors === 'object') {
-        const first = Object.values(json.errors)[0];
-        if (Array.isArray(first) && first[0]) return first[0];
-      }
+  if (data.errors) {
+    if (Array.isArray(data.errors) && data.errors[0]?.msg) {
+      return data.errors[0].msg
+    }
+    if (typeof data.errors === 'object') {
+      const first = Object.values(data.errors)[0]
+      if (Array.isArray(first) && first[0]) return first[0] as string
     }
   }
 
-  if (raw.trim()) return raw.trim();
-  return `Request failed with status ${status}`;
+  return 'Something went wrong'
 }
 
-/**
- * Ensure _id is always present on a user object regardless of
- * whether the backend sent "id" or "_id".
- */
-function normaliseUser(user: any): any {
-  if (!user) return user;
-  if (!user._id && user.id) user._id = user.id;
-  return user;
+const normaliseUser = (user: any) => {
+  if (!user) return user
+  if (!user._id && user.id) user._id = user.id
+  return user
 }
 
-// ============================================
+// =============================
 // Service
-// ============================================
+// =============================
 export const authService = {
-  // =============================
+  // -----------------------------
   // PUBLIC
-  // =============================
-  register: async (data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-    phoneNumber?: string;
-    cohort?: string;
-  }): Promise<ServiceResponse> => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
+  // -----------------------------
+  register: async (data: any): Promise<ServiceResponse> => {
+    try {
+      const res = await axiosClient.post<AuthResponse>('/auth/register', data)
+      const result = res.data
 
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    });
-
-    const { raw, json } = await readBody(response);
-
-    if (!response.ok) {
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    const result = json as AuthResponse;
-
-    if (result.accessToken) {
-      localStorage.setItem('authToken', result.accessToken);
-      if (result.refreshToken) {
-        localStorage.setItem('refreshToken', result.refreshToken);
+      if (result.accessToken) {
+        localStorage.setItem('authToken', result.accessToken)
+        if (result.refreshToken) localStorage.setItem('refreshToken', result.refreshToken)
       }
-    }
 
-    return {
-      success: result.success,
-      token: result.accessToken,
-      refreshToken: result.refreshToken,
-      data: normaliseUser(result.user),
-    };
+      return {
+        success: result.success,
+        token: result.accessToken,
+        refreshToken: result.refreshToken,
+        data: normaliseUser(result.user),
+      }
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   login: async (credentials: { email: string; password: string }): Promise<ServiceResponse> => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
+    try {
+      const res = await axiosClient.post<AuthResponse>('/auth/login', credentials)
+      const result = res.data
 
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(credentials),
-    });
+      if (result.success === false) throw new Error(result.message)
 
-    // Single read — raw preserved so we never lose the body
-    const { raw, json } = await readBody(response);
-
-    if (!response.ok) {
-      // Log the full raw payload so we can see exactly what came back
-      console.error('❌ Login failed:', { status: response.status, body: raw });
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    const result = json as AuthResponse;
-
-    // Backend returned 200 but explicitly flagged failure
-    if (result.success === false) {
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    if (result.accessToken) {
-      localStorage.setItem('authToken', result.accessToken);
-      if (result.refreshToken) {
-        localStorage.setItem('refreshToken', result.refreshToken);
+      if (result.accessToken) {
+        localStorage.setItem('authToken', result.accessToken)
+        if (result.refreshToken) localStorage.setItem('refreshToken', result.refreshToken)
       }
-    }
 
-    return {
-      success: true,
-      token: result.accessToken,
-      refreshToken: result.refreshToken,
-      data: normaliseUser(result.user),
-    };
+      return {
+        success: true,
+        token: result.accessToken,
+        refreshToken: result.refreshToken,
+        data: normaliseUser(result.user),
+      }
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   refreshToken: async (): Promise<ServiceResponse> => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
+    try {
+      const refreshToken = localStorage.getItem('refreshToken')
+      const res = await axiosClient.post<AuthResponse>('/auth/refresh', { refreshToken })
+      const result = res.data
 
-    const refreshToken = localStorage.getItem('refreshToken');
-
-    const response = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: refreshToken ? JSON.stringify({ refreshToken }) : undefined,
-    });
-
-    const { raw, json } = await readBody(response);
-
-    if (!response.ok) {
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    const result = json as AuthResponse;
-
-    if (result.accessToken) {
-      localStorage.setItem('authToken', result.accessToken);
-      if (result.refreshToken) {
-        localStorage.setItem('refreshToken', result.refreshToken);
+      if (result.accessToken) {
+        localStorage.setItem('authToken', result.accessToken)
+        if (result.refreshToken) localStorage.setItem('refreshToken', result.refreshToken)
       }
+
+      return {
+        success: result.success,
+        token: result.accessToken,
+        refreshToken: result.refreshToken,
+        data: normaliseUser(result.user),
+      }
+    } catch (err) {
+      throw new Error(extractError(err))
     }
-
-    return {
-      success: result.success,
-      token: result.accessToken,
-      refreshToken: result.refreshToken,
-      data: normaliseUser(result.user),
-    };
   },
 
-  forgotPassword: async (email: string) => {
-    const response = await fetch(`${API_URL}/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    return handleResponse(response);
-  },
+  forgotPassword: (email: string) =>
+    axiosClient.post('/auth/forgot-password', { email }),
 
-  resetPassword: async (resetToken: string, password: string) => {
-    const response = await fetch(`${API_URL}/auth/reset-password/${resetToken}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-    return handleResponse(response);
-  },
+  resetPassword: (token: string, password: string) =>
+    axiosClient.put(`/auth/reset-password/${token}`, { password }),
 
-  verifyEmail: async (token: string) => {
-    const response = await fetch(`${API_URL}/auth/verify-email/${token}`, {
-      method: 'GET',
-    });
-    return handleResponse(response);
-  },
+  verifyEmail: (token: string) =>
+    axiosClient.get(`/auth/verify-email/${token}`),
 
-  // =============================
+  // -----------------------------
   // PROTECTED
-  // =============================
-  getMe: async () => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
+  // -----------------------------
+async getMe() {
+    try {
+      const token = this.getToken()
+      
+      console.log('🔍 getMe Debug:')
+      console.log('- Token exists:', !!token)
+      console.log('- Token (first 20 chars):', token?.substring(0, 20))
+      
+      
+      if (!token) {
+        console.log('❌ No token found in localStorage')
+        return { success: false, message: 'No authentication token' }
+      }
 
     
-    const response = await fetchWithAuth(`${API_URL}/auth/me`);
-    const { raw, json } = await readBody(response);
+      
+      const response = await axiosClient.get<ServiceResponse>("/auth/me")
 
-    if (!response.ok) {
-      throw new Error(extractError(json, raw, response.status));
+      console.log('- Response status:', response.status)
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ getMe Error Details:', {
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      })
+      throw error
     }
+  },
 
-    const result = json as AuthResponse;
-
-    return {
-      success: result.success,
-      data: normaliseUser(result.data),
-    };
+  getProfile: async () => {
+    try {
+      const res = await axiosClient.get<ServiceResponse>('/auth/profile')
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
   logout: async () => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
-
     try {
-      await fetchWithAuth(`${API_URL}/auth/logout`, { method: 'POST' });
-    } catch {
-      // best-effort — tokens cleared below regardless
+      await axiosClient.post('/auth/logout')
     } finally {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('refreshToken')
     }
-
-    return { success: true };
+    return { success: true }
   },
 
   logoutAll: async () => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
-    }
-
     try {
-      await fetchWithAuth(`${API_URL}/auth/logout-all`, { method: 'POST' });
-    } catch {
-      // best-effort
+      await axiosClient.post('/auth/logout-all')
     } finally {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
+      localStorage.clear()
     }
-
-    return { success: true };
+    return { success: true }
   },
 
-  updateProfile: async (data: FormData | {
-    firstName?: string;
-    lastName?: string;
-    phoneNumber?: string;
-    githubProfile?: string;
-    linkedinProfile?: string;
-    portfolioUrl?: string;
-  }) => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
+  updateProfile: async (data: FormData | any) => {
+    try {
+      // If it's FormData, clean it up to remove empty string values
+      if (data instanceof FormData) {
+        const cleanedData = new FormData()
+        
+        // Iterate through all entries and only add non-empty values
+        for (const [key, value] of data.entries()) {
+          if (value instanceof File) {
+            // Always add file uploads
+            cleanedData.append(key, value)
+          } else if (typeof value === 'string' && value.trim() !== '') {
+            // Only add non-empty strings
+            cleanedData.append(key, value.trim())
+          } else if (typeof value !== 'string' && value !== null && value !== undefined) {
+            // Add other non-null/undefined values
+            cleanedData.append(key, value)
+          }
+        }
+        
+        data = cleanedData
+      } else {
+        // If it's a plain object, remove empty strings
+        const cleanedData: any = {}
+        for (const [key, value] of Object.entries(data)) {
+          if (typeof value === 'string' && value.trim() !== '') {
+            cleanedData[key] = value.trim()
+          } else if (typeof value !== 'string' && value !== null && value !== undefined) {
+            cleanedData[key] = value
+          }
+        }
+        data = cleanedData
+      }
+
+      const res = await axiosClient.put<AuthResponse>('/auth/profile', data, {
+        headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+      })
+
+      return {
+        success: res.data.success,
+        message: res.data.message,
+        data: normaliseUser(res.data.data),
+      }
+    } catch (err) {
+      throw new Error(extractError(err))
     }
-
-    const token = getAuthToken();
-    const headers: any = {
-      ...(token && { Authorization: `Bearer ${token}` }),
-    };
-
-    if (!(data instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    const response = await fetch(`${API_URL}/auth/profile`, {
-      method: 'PUT',
-      headers,
-      credentials: 'include',
-      body: data instanceof FormData ? data : JSON.stringify(data),
-    });
-
-    const { raw, json } = await readBody(response);
-
-    if (!response.ok) {
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    const result = json as AuthResponse;
-
-    return {
-      success: result.success,
-      message: result.message,
-      data: normaliseUser(result.data),
-    };
   },
 
-  changePassword: async (data: {
-    currentPassword: string;
-    newPassword: string;
-  }) => {
-    if (typeof window === 'undefined') {
-      throw new Error('Auth service can only be used on client side');
+  changePassword: async (data: { currentPassword: string; newPassword: string }) => {
+    try {
+      const res = await axiosClient.put<AuthResponse>('/auth/change-password', data)
+
+      if (res.data.success) {
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('refreshToken')
+      }
+
+      return { success: res.data.success, message: res.data.message }
+    } catch (err) {
+      throw new Error(extractError(err))
     }
-
-    const response = await fetchWithAuth(`${API_URL}/auth/change-password`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-
-    const { raw, json } = await readBody(response);
-
-    if (!response.ok) {
-      throw new Error(extractError(json, raw, response.status));
-    }
-
-    const result = json as AuthResponse;
-
-    // Password changed — force re-login
-    if (result.success) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
-    }
-
-    return { success: result.success, message: result.message };
   },
 
-  // =============================
+  // -----------------------------
   // UTILITY
-  // =============================
-  isAuthenticated: (): boolean => {
-    if (typeof window === 'undefined') return false;
-    return !!getAuthToken();
-  },
-
-  getToken: (): string | null => {
-    if (typeof window === 'undefined') return null;
-    return getAuthToken();
-  },
-
+  // -----------------------------
+  isAuthenticated: () => !!localStorage.getItem('authToken'),
+  getToken: () => localStorage.getItem('authToken'),
   clearTokens: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('login_attempts');
-      localStorage.removeItem('account_lockout');
-    }
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('refreshToken')
   },
-};
+}

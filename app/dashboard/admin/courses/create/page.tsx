@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { courseService } from '@/services/courseService'
-import { adminService } from '@/services/adminService'
+import { programService } from '@/services/programService'
 import {
   ArrowLeft,
   Upload,
@@ -14,18 +14,11 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
-import { programService } from '@/services/programService'
-
-interface Instructor {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-}
 
 interface Program {
   _id: string
   name: string
+  title?: string
 }
 
 export default function CreateCoursePage() {
@@ -36,25 +29,26 @@ export default function CreateCoursePage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   
-  const [instructors, setInstructors] = useState<Instructor[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
-  const [loadingData, setLoadingData] = useState(true)
+  const [loadingPrograms, setLoadingPrograms] = useState(true)
 
-  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
-  const [thumbnailPreview, setThumbnailPreview] = useState<string>('')
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
+  const [coverImagePreview, setCoverImagePreview] = useState<string>('')
 
   const [formData, setFormData] = useState({
-    name: '',
     title: '',
+    slug: '',
     description: '',
-    category: '',
-    level: 'beginner',
-    instructor: '',
     program: '',
-    duration: '',
-    requirements: [''],
-    learningOutcomes: [''],
+    order: '1',
+    estimatedHours: '',
+    objectives: [''],
+    prerequisites: [''],
+    targetAudience: '',
     isPublished: false,
+    minimumQuizScore: '70',
+    requiredProjects: '5',
+    capstoneRequired: true,
   })
 
   useEffect(() => {
@@ -64,30 +58,30 @@ export default function CreateCoursePage() {
       return
     }
     
-    fetchInstructorsAndPrograms()
+    fetchPrograms()
   }, [authLoading, isAuthenticated, user])
 
-  const fetchInstructorsAndPrograms = async () => {
+  const fetchPrograms = async () => {
     try {
-      setLoadingData(true)
+      setLoadingPrograms(true)
+      const response = await programService.getPrograms({ isPublished: true })
       
-      // Fetch instructors
-      const instructorsResponse = await adminService.getAllInstructors()
-      if (instructorsResponse.success && Array.isArray(instructorsResponse.data)) {
-        setInstructors(instructorsResponse.data)
+      if (response.success && Array.isArray(response.data)) {
+        setPrograms(response.data)
       }
-      
-      // Fetch programs - you'll need to add this to your service
-      const programsResponse = await programService.getPrograms()
-      if (programsResponse.success && Array.isArray(programsResponse.data)) {
-        setPrograms(programsResponse.data)
-      }
-      
     } catch (err: any) {
-      console.error('Failed to fetch data:', err)
+      console.error('Failed to fetch programs:', err)
     } finally {
-      setLoadingData(false)
+      setLoadingPrograms(false)
     }
+  }
+
+  // Auto-generate slug from title
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -98,31 +92,36 @@ export default function CreateCoursePage() {
       setFormData(prev => ({ ...prev, [name]: checked }))
     } else {
       setFormData(prev => ({ ...prev, [name]: value }))
+      
+      // Auto-generate slug when title changes
+      if (name === 'title' && !formData.slug) {
+        setFormData(prev => ({ ...prev, slug: generateSlug(value) }))
+      }
     }
   }
 
-  const handleArrayFieldChange = (field: 'requirements' | 'learningOutcomes', index: number, value: string) => {
+  const handleArrayFieldChange = (field: 'objectives' | 'prerequisites', index: number, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].map((item, i) => i === index ? value : item)
     }))
   }
 
-  const addArrayField = (field: 'requirements' | 'learningOutcomes') => {
+  const addArrayField = (field: 'objectives' | 'prerequisites') => {
     setFormData(prev => ({
       ...prev,
       [field]: [...prev[field], '']
     }))
   }
 
-  const removeArrayField = (field: 'requirements' | 'learningOutcomes', index: number) => {
+  const removeArrayField = (field: 'objectives' | 'prerequisites', index: number) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
     }))
   }
 
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -135,20 +134,20 @@ export default function CreateCoursePage() {
         return
       }
       
-      setThumbnailFile(file)
+      setCoverImageFile(file)
       
       // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
-        setThumbnailPreview(reader.result as string)
+        setCoverImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const removeThumbnail = () => {
-    setThumbnailFile(null)
-    setThumbnailPreview('')
+  const removeCoverImage = () => {
+    setCoverImageFile(null)
+    setCoverImagePreview('')
   }
 
   const validateForm = () => {
@@ -162,13 +161,13 @@ export default function CreateCoursePage() {
       return false
     }
     
-    if (!formData.category.trim()) {
-      setError('Course category is required')
+    if (!formData.program) {
+      setError('Please select a program')
       return false
     }
     
-    if (!formData.instructor) {
-      setError('Please select an instructor')
+    if (!formData.slug.trim()) {
+      setError('Course slug is required')
       return false
     }
     
@@ -189,36 +188,43 @@ export default function CreateCoursePage() {
       
       // Add basic fields
       data.append('title', formData.title)
+      data.append('slug', formData.slug)
       data.append('description', formData.description)
-      data.append('category', formData.category)
-      data.append('level', formData.level)
-      data.append('instructor', formData.instructor)
+      data.append('program', formData.program)
+      data.append('order', formData.order)
       
-      if (formData.program) {
-        data.append('program', formData.program)
+      if (formData.estimatedHours) {
+        data.append('estimatedHours', formData.estimatedHours)
       }
       
-      if (formData.duration) {
-        data.append('duration', formData.duration)
+      if (formData.targetAudience) {
+        data.append('targetAudience', formData.targetAudience)
       }
       
       data.append('isPublished', String(formData.isPublished))
       
-      // Add arrays
-      const filteredRequirements = formData.requirements.filter(r => r.trim())
-      const filteredOutcomes = formData.learningOutcomes.filter(o => o.trim())
-      
-      if (filteredRequirements.length > 0) {
-        data.append('requirements', JSON.stringify(filteredRequirements))
+      // Add objectives
+      const filteredObjectives = formData.objectives.filter(o => o.trim())
+      if (filteredObjectives.length > 0) {
+        data.append('objectives', JSON.stringify(filteredObjectives))
       }
       
-      if (filteredOutcomes.length > 0) {
-        data.append('learningOutcomes', JSON.stringify(filteredOutcomes))
+      // Add prerequisites
+      const filteredPrerequisites = formData.prerequisites.filter(p => p.trim())
+      if (filteredPrerequisites.length > 0) {
+        data.append('prerequisites', JSON.stringify(filteredPrerequisites))
       }
       
-      // Add thumbnail
-      if (thumbnailFile) {
-        data.append('thumbnail', thumbnailFile)
+      // Add completion criteria
+      data.append('completionCriteria', JSON.stringify({
+        minimumQuizScore: parseInt(formData.minimumQuizScore),
+        requiredProjects: parseInt(formData.requiredProjects),
+        capstoneRequired: formData.capstoneRequired
+      }))
+      
+      // Add cover image
+      if (coverImageFile) {
+        data.append('coverImage', coverImageFile)
       }
       
       const response = await courseService.createCourse(data)
@@ -238,7 +244,7 @@ export default function CreateCoursePage() {
     }
   }
 
-  if (authLoading || loadingData) {
+  if (authLoading || loadingPrograms) {
     return (
       <div className="min-h-screen bg-slate-900 flex">
         <AdminSidebar />
@@ -308,10 +314,27 @@ export default function CreateCoursePage() {
                     name="title"
                     value={formData.title}
                     onChange={handleInputChange}
-                    placeholder="e.g., Introduction to Web Development"
+                    placeholder="e.g., Introduction to Python Programming"
                     className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                     required
                   />
+                </div>
+
+                {/* Slug */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    URL Slug *
+                  </label>
+                  <input
+                    type="text"
+                    name="slug"
+                    value={formData.slug}
+                    onChange={handleInputChange}
+                    placeholder="e.g., intro-to-python-programming"
+                    className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
+                    required
+                  />
+                  <p className="text-gray-500 text-xs mt-1">Auto-generated from title, but you can customize it</p>
                 </div>
 
                 {/* Description */}
@@ -330,121 +353,90 @@ export default function CreateCoursePage() {
                   />
                 </div>
 
-                {/* Category and Level */}
-                <div className="grid sm:grid-cols-2 gap-4">
+                {/* Program, Order, and Hours */}
+                <div className="grid sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Category *
+                      Program *
                     </label>
-                    <input
-                      type="text"
-                      name="category"
-                      value={formData.category}
+                    <select
+                      name="program"
+                      value={formData.program}
                       onChange={handleInputChange}
-                      placeholder="e.g., Programming, Design"
                       className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                       required
+                    >
+                      <option value="">Select program</option>
+                      {programs.map(program => (
+                        <option key={program._id} value={program._id}>
+                          {program.name || program.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Order
+                    </label>
+                    <input
+                      type="number"
+                      name="order"
+                      value={formData.order}
+                      onChange={handleInputChange}
+                      min="1"
+                      className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Level *
+                      Estimated Hours
                     </label>
-                    <select
-                      name="level"
-                      value={formData.level}
+                    <input
+                      type="number"
+                      name="estimatedHours"
+                      value={formData.estimatedHours}
                       onChange={handleInputChange}
+                      placeholder="e.g., 40"
+                      min="0"
                       className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
-                {/* Duration */}
+                {/* Target Audience */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Duration (in minutes)
+                    Target Audience
                   </label>
                   <input
-                    type="number"
-                    name="duration"
-                    value={formData.duration}
+                    type="text"
+                    name="targetAudience"
+                    value={formData.targetAudience}
                     onChange={handleInputChange}
-                    placeholder="e.g., 120"
-                    min="0"
+                    placeholder="e.g., Beginners with no programming experience"
                     className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Instructor and Program */}
+            {/* Cover Image */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Assignment</h2>
+              <h2 className="text-xl font-bold text-white mb-4">Cover Image</h2>
               
               <div className="space-y-4">
-                {/* Instructor */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Instructor *
-                  </label>
-                  <select
-                    name="instructor"
-                    value={formData.instructor}
-                    onChange={handleInputChange}
-                    className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
-                    required
-                  >
-                    <option value="">Select an instructor</option>
-                    {instructors.map(instructor => (
-                      <option key={instructor._id} value={instructor._id}>
-                        {instructor.firstName} {instructor.lastName} ({instructor.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Program */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Program 
-                  </label>
-                  <select
-                    name="program"
-                    value={formData.program}
-                    onChange={handleInputChange}
-                    className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
-                  >
-                    <option value="">No program</option>
-                    {programs.map(program => (
-                      <option key={program._id} value={program._id}>
-                        {program.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Thumbnail */}
-            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Course Thumbnail</h2>
-              
-              <div className="space-y-4">
-                {thumbnailPreview ? (
+                {coverImagePreview ? (
                   <div className="relative w-full h-48 rounded-lg overflow-hidden bg-slate-700">
                     <img
-                      src={thumbnailPreview}
-                      alt="Thumbnail preview"
+                      src={coverImagePreview}
+                      alt="Cover preview"
                       className="w-full h-full object-cover"
                     />
                     <button
                       type="button"
-                      onClick={removeThumbnail}
+                      onClick={removeCoverImage}
                       className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
                     >
                       <X size={20} className="text-white" />
@@ -455,12 +447,12 @@ export default function CreateCoursePage() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handleThumbnailChange}
+                      onChange={handleCoverImageChange}
                       className="hidden"
                     />
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 hover:text-lime-400 transition-colors">
                       <Upload size={48} />
-                      <p className="mt-2 text-sm">Click to upload thumbnail</p>
+                      <p className="mt-2 text-sm">Click to upload cover image</p>
                       <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
                     </div>
                   </label>
@@ -468,34 +460,34 @@ export default function CreateCoursePage() {
               </div>
             </div>
 
-            {/* Requirements */}
+            {/* Objectives */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-white">Requirements</h2>
+                <h2 className="text-xl font-bold text-white">Course Objectives</h2>
                 <button
                   type="button"
-                  onClick={() => addArrayField('requirements')}
+                  onClick={() => addArrayField('objectives')}
                   className="flex items-center gap-2 text-lime-400 hover:text-lime-300 text-sm transition-colors"
                 >
                   <Plus size={16} />
-                  Add Requirement
+                  Add Objective
                 </button>
               </div>
               
               <div className="space-y-3">
-                {formData.requirements.map((req, index) => (
+                {formData.objectives.map((obj, index) => (
                   <div key={index} className="flex gap-2">
                     <input
                       type="text"
-                      value={req}
-                      onChange={(e) => handleArrayFieldChange('requirements', index, e.target.value)}
-                      placeholder="e.g., Basic understanding of HTML"
+                      value={obj}
+                      onChange={(e) => handleArrayFieldChange('objectives', index, e.target.value)}
+                      placeholder="e.g., Understand Python syntax and data types"
                       className="flex-1 bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                     />
-                    {formData.requirements.length > 1 && (
+                    {formData.objectives.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => removeArrayField('requirements', index)}
+                        onClick={() => removeArrayField('objectives', index)}
                         className="p-2 text-red-400 hover:text-red-300 transition-colors"
                       >
                         <X size={20} />
@@ -506,34 +498,34 @@ export default function CreateCoursePage() {
               </div>
             </div>
 
-            {/* Learning Outcomes */}
+            {/* Prerequisites */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-white">Learning Outcomes</h2>
+                <h2 className="text-xl font-bold text-white">Prerequisites</h2>
                 <button
                   type="button"
-                  onClick={() => addArrayField('learningOutcomes')}
+                  onClick={() => addArrayField('prerequisites')}
                   className="flex items-center gap-2 text-lime-400 hover:text-lime-300 text-sm transition-colors"
                 >
                   <Plus size={16} />
-                  Add Outcome
+                  Add Prerequisite
                 </button>
               </div>
               
               <div className="space-y-3">
-                {formData.learningOutcomes.map((outcome, index) => (
+                {formData.prerequisites.map((prereq, index) => (
                   <div key={index} className="flex gap-2">
                     <input
                       type="text"
-                      value={outcome}
-                      onChange={(e) => handleArrayFieldChange('learningOutcomes', index, e.target.value)}
-                      placeholder="e.g., Build responsive websites"
+                      value={prereq}
+                      onChange={(e) => handleArrayFieldChange('prerequisites', index, e.target.value)}
+                      placeholder="e.g., Basic computer skills"
                       className="flex-1 bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
                     />
-                    {formData.learningOutcomes.length > 1 && (
+                    {formData.prerequisites.length > 1 && (
                       <button
                         type="button"
-                        onClick={() => removeArrayField('learningOutcomes', index)}
+                        onClick={() => removeArrayField('prerequisites', index)}
                         className="p-2 text-red-400 hover:text-red-300 transition-colors"
                       >
                         <X size={20} />
@@ -541,6 +533,58 @@ export default function CreateCoursePage() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Completion Criteria */}
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Completion Criteria</h2>
+              
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Quiz Score (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="minimumQuizScore"
+                    value={formData.minimumQuizScore}
+                    onChange={handleInputChange}
+                    min="0"
+                    max="100"
+                    className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Required Projects
+                  </label>
+                  <input
+                    type="number"
+                    name="requiredProjects"
+                    value={formData.requiredProjects}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full bg-slate-700 border border-gray-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-400 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="capstoneRequired"
+                    checked={formData.capstoneRequired}
+                    onChange={handleInputChange}
+                    className="w-5 h-5 rounded border-gray-600 text-lime-500 focus:ring-lime-400 focus:ring-offset-slate-800"
+                  />
+                  <div>
+                    <p className="text-white font-medium">Capstone Project Required</p>
+                    <p className="text-gray-400 text-sm">Students must complete a capstone project to finish this course</p>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -573,7 +617,7 @@ export default function CreateCoursePage() {
               
               <Link
                 href="/dashboard/admin/courses"
-                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-colors"
+                className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-colors text-center"
               >
                 Cancel
               </Link>

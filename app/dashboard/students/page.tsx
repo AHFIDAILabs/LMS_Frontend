@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/context/AuthContext'
-import { useCourses } from '@/hooks/useCourses'
+import { studentService } from '@/services/studentService'
 import {
   Card,
   CardHeader,
@@ -17,54 +17,70 @@ import { Button } from '@/components/ui/Button'
 import { CircularProgress } from '@/components/ui/ProgressBar'
 import { Avatar } from '@/components/ui/Avatar'
 import StudentSidebar from '@/components/dashboard/StudentSidebar'
+import toast from 'react-hot-toast'
 
 export default function DashboardPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
-  const { getMyCourses, loading: coursesLoading } = useCourses()
   const router = useRouter()
   
   const [courses, setCourses] = useState<any[]>([])
-  const [overallProgress, setOverallProgress] = useState(0)
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
- useEffect(() => {
-  if (authLoading) return
-  if (!isAuthenticated || !user) {
-    router.replace('/auth/login')
-    return
-  }
+  useEffect(() => {
+    if (authLoading) return
+    
+    if (!isAuthenticated || !user) {
+      router.replace('/auth/login')
+      return
+    }
 
-  // Instructor without a program can't use any dashboard
-  if (user.role === 'instructor' && !user.programId) {
-    router.replace('/')
-    return
-  }
+    // Instructor without a program can't use any dashboard
+    if (user.role === 'instructor' && !user.programId) {
+      router.replace('/')
+      return
+    }
 
-  // This IS the student dashboard — only students belong here
-  if (user.role !== 'student') {
-    router.replace('/')
-    return
-  }
+    // This IS the student dashboard — only students belong here
+    if (user.role !== 'student') {
+      router.replace('/')
+      return
+    }
 
-  const loadData = async () => {
+    loadDashboardData()
+  }, [authLoading, isAuthenticated, user, router])
+
+  const loadDashboardData = async () => {
     try {
-      const coursesData = await getMyCourses()
-      console.log('Courses data:', coursesData)
-      setCourses(coursesData || [])
+      setLoading(true)
 
-      if (coursesData && coursesData.length > 0) {
-        const totalProgress = coursesData.reduce((sum: number, course: any) => {
-          return sum + (course.progress?.overallProgress || 0)
-        }, 0)
-        setOverallProgress(Math.round(totalProgress / coursesData.length))
+      // Fetch enrolled courses
+      const coursesResponse = await studentService.getEnrolledCourses()
+      
+      if (coursesResponse.success) {
+        setCourses(coursesResponse.data || [])
+      } else {
+        toast.error(coursesResponse.error || 'Failed to load courses')
       }
+
+      // Fetch dashboard overview
+      const overviewResponse = await studentService.getDashboardOverview()
+      
+      if (overviewResponse.success) {
+        setDashboardData(overviewResponse.data)
+      } else {
+        console.error('Failed to load dashboard overview:', overviewResponse.error)
+      }
+
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
+      toast.error('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
     }
   }
 
-  loadData()
-}, [authLoading, isAuthenticated, user, router, getMyCourses])
-  if (authLoading || coursesLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -87,6 +103,11 @@ export default function DashboardPage() {
         return 'neutral'
     }
   }
+
+  const overallProgress = dashboardData?.courses?.overallProgress || 0
+  const totalCourses = courses.length
+  const completedCourses = courses.filter((c: any) => c.enrollmentStatus === 'completed').length
+  const activeCourses = courses.filter((c: any) => c.enrollmentStatus === 'active').length
 
   return (
     <div className="min-h-screen bg-slate-900 flex">
@@ -121,7 +142,7 @@ export default function DashboardPage() {
         {/* Content */}
         <main className="container-custom py-8 space-y-8">
           {/* Welcome */}
-          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
+          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-0 right-0 w-96 h-96 bg-lime-500/10 blur-[140px]" />
             </div>
@@ -129,10 +150,10 @@ export default function DashboardPage() {
             <div className="relative flex items-center justify-between">
               <div>
                 <h2 className="text-3xl font-bold text-white mb-2">
-                  Keep going 
+                  Keep going, {user?.firstName}! 
                 </h2>
                 <p className="text-gray-400 text-lg">
-                  {courses.length > 0 
+                  {totalCourses > 0 
                     ? "You're making great progress!"
                     : "Start your learning journey today"}
                 </p>
@@ -155,7 +176,7 @@ export default function DashboardPage() {
                   </Link>
                 </header>
 
-                {courses.length === 0 ? (
+                {totalCourses === 0 ? (
                   <Card>
                     <CardContent className="p-12 text-center">
                       <div className="mb-4 text-gray-500">
@@ -203,7 +224,7 @@ export default function DashboardPage() {
 
                             <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-linear-to-r from-lime-500 to-emerald-500 transition-all duration-300"
+                                className="h-full bg-gradient-to-r from-lime-500 to-emerald-500 transition-all duration-300"
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
@@ -232,22 +253,63 @@ export default function DashboardPage() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
                     <span className="text-gray-400">Total Courses</span>
-                    <span className="text-2xl font-bold text-white">{courses.length}</span>
+                    <span className="text-2xl font-bold text-white">{totalCourses}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
                     <span className="text-gray-400">Completed</span>
                     <span className="text-2xl font-bold text-lime-500">
-                      {courses.filter((c: any) => c.enrollmentStatus === 'completed').length}
+                      {completedCourses}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-slate-800/50 rounded-lg">
                     <span className="text-gray-400">In Progress</span>
                     <span className="text-2xl font-bold text-yellow-500">
-                      {courses.filter((c: any) => c.enrollmentStatus === 'active').length}
+                      {activeCourses}
                     </span>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Learning Stats */}
+              {dashboardData?.lessons && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Learning Progress</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm">Lessons Completed</span>
+                      <span className="text-white font-semibold">
+                        {dashboardData.lessons.completed} / {dashboardData.lessons.total}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 text-sm">Completion Rate</span>
+                      <span className="text-lime-400 font-semibold">
+                        {dashboardData.lessons.completionRate}%
+                      </span>
+                    </div>
+                    {dashboardData.assessments && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 text-sm">Assessments</span>
+                          <span className="text-white font-semibold">
+                            {dashboardData.assessments.completed} / {dashboardData.assessments.total}
+                          </span>
+                        </div>
+                        {dashboardData.assessments.averageScore > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">Average Score</span>
+                            <span className="text-blue-400 font-semibold">
+                              {dashboardData.assessments.averageScore}%
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </aside>
           </div>
         </main>

@@ -35,7 +35,7 @@ export async function handleResponse<T>(response: Response): Promise<ApiResponse
       return {
         success: false,
         error: data?.error || data?.message || `Error ${response.status}`,
-        data: null,
+        data: null as any,
       };
     }
 
@@ -57,7 +57,7 @@ export async function handleResponse<T>(response: Response): Promise<ApiResponse
     return {
       success: false,
       error: "Network or parsing error",
-      data: null,
+      data: null as any,
     };
   }
 }

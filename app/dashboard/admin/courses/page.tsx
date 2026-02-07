@@ -4,30 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { courseService } from '@/services/courseService'
+import { Course } from '@/types'
 import { Book, Eye, Edit, Trash2, CheckCircle, XCircle, Globe, Lock, Plus } from 'lucide-react'
 import Link from 'next/link'
 
-interface Course {
-  _id: string
-  title: string
-  description: string
-  category: string
-  level: string
-  isPublished: boolean
-  isApproved?: boolean
-  instructor?: {
-    _id: string
-    firstName: string
-    lastName: string
-  }
-  program?: {
-    _id: string
-    name: string
-  }
-  thumbnail?: string
-  enrollmentCount?: number
-  createdAt: string
-}
+
 
 // Badge styles
 const LEVEL_STYLES: Record<string, string> = {
@@ -97,8 +78,8 @@ export default function AdminCoursesPage() {
         c.title.toLowerCase().includes(term) ||
         c.description.toLowerCase().includes(term) ||
         c.category?.toLowerCase().includes(term) ||
-        c.instructor?.firstName?.toLowerCase().includes(term) ||
-        c.instructor?.lastName?.toLowerCase().includes(term)
+        c.createdBy?.firstName?.toLowerCase().includes(term) ||
+        c.createdBy?.lastName?.toLowerCase().includes(term)
     )
   }, [courses, search])
 
@@ -303,11 +284,11 @@ export default function AdminCoursesPage() {
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Thumbnail */}
+                    {/* coverImage */}
                     <div className="w-full lg:w-48 h-32 bg-linear-to-br from-slate-700 to-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {course.thumbnail ? (
+                      {course.coverImage ? (
                         <img
-                          src={course.thumbnail.startsWith('http') ? course.thumbnail : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${course.thumbnail}`}
+                          src={course.coverImage.startsWith('http') ? course.coverImage : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${course.coverImage}`}
                           alt={course.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -348,24 +329,29 @@ export default function AdminCoursesPage() {
                             )}
                           </span>
                           
-                          {course.level && (
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                              LEVEL_STYLES[course.level.toLowerCase()] || LEVEL_STYLES.beginner
-                            }`}>
-                              {course.level}
-                            </span>
-                          )}
+                      {course.level && (() => {
+  const level = Array.isArray(course.level) ? course.level[0] : course.level;
+  const levelKey = level?.toLowerCase() || 'beginner';
+  
+  return (
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+      LEVEL_STYLES[levelKey] || LEVEL_STYLES.beginner
+    }`}>
+      {level}
+    </span>
+  );
+})()}
                         </div>
                       </div>
 
                       {/* Metadata */}
                       <div className="flex flex-wrap gap-4 text-sm text-gray-400">
-                        {course.instructor && (
+                        {course.facilitator && (
                           <span className="flex items-center gap-1">
                             <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs">
-                              {course.instructor.firstName[0]}{course.instructor.lastName[0]}
+                              {course.facilitator?.firstName}{course.facilitator?.lastName}
                             </span>
-                            {course.instructor.firstName} {course.instructor.lastName}
+                            {course.facilitator?.firstName} {course.facilitator?.lastName}
                           </span>
                         )}
                         
@@ -377,13 +363,13 @@ export default function AdminCoursesPage() {
                         
                         {course.program && (
                           <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">
-                            {course.program.name}
+                            {course.program.title}
                           </span>
                         )}
                         
-                        {course.enrollmentCount !== undefined && (
+                        {course.currentEnrollment !== undefined && (
                           <span>
-                            {course.enrollmentCount} enrolled
+                            {course.currentEnrollment} enrolled
                           </span>
                         )}
                       </div>
@@ -428,7 +414,7 @@ export default function AdminCoursesPage() {
                           )}
                         </button>
                         
-                        {!course.isApproved && (
+                        {!course.approvalStatus && (
                           <>
                             <button
                               onClick={() => handleApproveCourse(course._id)}

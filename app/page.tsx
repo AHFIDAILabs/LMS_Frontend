@@ -2,7 +2,8 @@
 
 import { Navbar } from '@/components/layout/NavBar'
 import { ProgramHero } from '@/components/program/ProgramHero'
-import { ProgramsGrid } from '@/components/program/programGrid'
+import {NewProgramGrid} from "@/components/program/NewProgramGrid"
+import { CategoryGrid } from '@/components/program/categoryGrid'
 import { FeaturedCourses } from '@/components/sections/FeaturedCourseSection'
 import { ProcessSection } from '@/components/sections/ProcessSection'
 import { StatsSection } from '@/components/sections/StatsSection'
@@ -57,8 +58,8 @@ export default function HomePage() {
             <p className="text-red-400">Error loading programs: {error}</p>
           </div>
         ) : (
-          <ProgramsGrid 
-            programs={programs}
+          <CategoryGrid 
+
             title="Explore Our Programs"
             subtitle="Comprehensive learning paths designed to take you from beginner to expert"
           />

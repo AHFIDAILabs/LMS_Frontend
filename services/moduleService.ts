@@ -1,111 +1,182 @@
-// ============================================
 // services/moduleService.ts
-// ============================================
+import { ApiResponse } from '@/types'
+import { axiosClient } from '@/lib/axiosClient'
 
-import { fetchWithAuth, handleResponse } from '../lib/utils';
+// =============================
+// Error helper
+// =============================
+const extractError = (err: any): string => {
+  const data = err?.response?.data
+  if (!data) return err.message || 'Request failed'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+  if (data.error) return data.error
+  if (data.message) return data.message
+
+  if (data.errors) {
+    if (Array.isArray(data.errors) && data.errors[0]?.msg) return data.errors[0].msg
+    if (typeof data.errors === 'object') {
+      const first = Object.values(data.errors)[0]
+      if (Array.isArray(first) && first[0]) return first[0] as string
+    }
+  }
+
+  return 'Something went wrong'
+}
 
 export const moduleService = {
   // =====================================================
   // PUBLIC (Students)
   // =====================================================
 
-  // Get all published modules for a course
-  getModulesByCourse: async (courseId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/course/${courseId}`);
-    return handleResponse(response);
+ // =========================
+  // GET MODULES BY COURSE
+  // =========================
+  getModulesByCourse: async (
+    courseId: string,
+    includeUnpublished?: boolean
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.get(`/modules/course/${courseId}`, {
+        params: { includeUnpublished },
+      })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  // Get single module (with lessons + stats)
-  getModuleById: async (moduleId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/${moduleId}`);
-    return handleResponse(response);
+// =========================
+  // GET SINGLE MODULE
+  // =========================
+  getModule: async (moduleId: string): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.get(`/modules/${moduleId}`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
-
   // =====================================================
   // ADMIN / INSTRUCTOR
   // =====================================================
 
-  // Create module
+ // =========================
+  // CREATE MODULE
+  // =========================
   createModule: async (data: {
-    course: string;
-    title: string;
-    description: string;
-    order?: number;
-    learningObjectives?: string[];
-    sequenceLabel?: string;
-    estimatedMinutes?: number;
-    type?: string;
-  }) => {
-    const response = await fetchWithAuth(`${API_URL}/modules`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    course: string
+    title: string
+    description: string
+    learningObjectives?: string[]
+    sequenceLabel?: string
+    estimatedMinutes?: number
+    type?: 'core' | 'supplementary' | 'project' | 'assessment'
+    order?: number
+  }): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.post('/modules', data)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  // Update module
-  updateModule: async (moduleId: string, data: any) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/${moduleId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+  
+
+// =========================
+  // UPDATE MODULE
+  // =========================
+  updateModule: async (
+    moduleId: string,
+    data: {
+      title?: string
+      description?: string
+      learningObjectives?: string[]
+      sequenceLabel?: string
+      estimatedMinutes?: number
+      type?: 'core' | 'supplementary' | 'project' | 'assessment'
+      order?: number
+    }
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.put(`/modules/${moduleId}`, data)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  // Delete module
-  deleteModule: async (moduleId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/${moduleId}`, {
-      method: 'DELETE',
-    });
-    return handleResponse(response);
+ // =========================
+  // DELETE MODULE
+  // =========================
+  deleteModule: async (moduleId: string): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.delete(`/modules/${moduleId}`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  // Publish / Unpublish module (Admin only)
-  togglePublish: async (moduleId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/${moduleId}/publish`, {
-      method: 'PATCH',
-    });
-    return handleResponse(response);
+ // =========================
+  // TOGGLE PUBLISH
+  // =========================
+  togglePublish: async (moduleId: string): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.patch(`/modules/${moduleId}/toggle-publish`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-  // Reorder modules
-  reorderModules: async (orders: { moduleId: string; order: number }[]) => {
-    const response = await fetchWithAuth(`${API_URL}/modules/reorder`, {
-      method: 'PATCH',
-      body: JSON.stringify({ orders }),
-    });
-    return handleResponse(response);
+  // =========================
+  // REORDER MODULES
+  // =========================
+  reorderModules: async (orders: Array<{ moduleId: string; order: number }>): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.put('/modules/reorder', { orders })
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
   },
 
-
+  // Get module stats
   getModuleStats: async (courseId?: string) => {
-  const query = courseId ? `?courseId=${courseId}` : '';
-  const response = await fetchWithAuth(`${API_URL}/modules/stats/overview${query}`);
-  return handleResponse(response);
-},
+    const query = courseId ? `?courseId=${courseId}` : ''
+    const { data } = await axiosClient.get(`/modules/stats/overview${query}`)
+    return data
+  },
 
-getModuleContent: async (moduleId: string) => {
-  const response = await fetchWithAuth(`${API_URL}/modules/${moduleId}/content`);
-  return handleResponse(response);
-},
+    // =========================
+  // GET MODULE CONTENT (with lessons)
+  // =========================
+  getModuleContent: async (moduleId: string): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.get(`/modules/${moduleId}/content`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
+  },
 
 
+  
   // =====================================================
   // ADMIN DASHBOARD
   // =====================================================
 
   // Get all modules (admin)
   getAllModulesAdmin: async (params?: {
-    page?: number;
-    limit?: number;
-    courseId?: string;
-    type?: string;
-    isPublished?: boolean;
+    page?: number
+    limit?: number
+    courseId?: string
+    type?: string
+    isPublished?: boolean
   }) => {
-    const query = new URLSearchParams(params as any).toString();
-    const response = await fetchWithAuth(`${API_URL}/modules?${query}`);
-    return handleResponse(response);
+    const query = new URLSearchParams(params as any).toString()
+    const { data } = await axiosClient.get(`/modules?${query}`)
+    return data
   },
-};
+}

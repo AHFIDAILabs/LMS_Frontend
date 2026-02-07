@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
+import Image from "next/image"
 import clsx from 'clsx'
 import {
   LayoutDashboard,
@@ -17,6 +18,7 @@ import {
   Layers,
   FileText,
   Bell,
+  Gift, // For scholarships
 } from 'lucide-react'
 
 // ──────────────────────────────────────────────
@@ -50,7 +52,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
           { label: 'Instructors', href: '/dashboard/admin/users/instructors', icon: Users },
         ],
       },
-           {
+      {
         label: 'Programs',
         href: '/dashboard/admin/programes',
         icon: Layers,
@@ -69,7 +71,16 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         ],
       },
       { label: 'Approvals', href: '/dashboard/admin/approvals', icon: CheckCircle2 },
-      { label: 'Enrollments', href: '/dashboard/admin/enrollments', icon: FileText },
+      { label: 'Enrollments', href: '/dashboard/admin/enrollment', icon: FileText },
+      {
+        label: 'Scholarships',
+        href: '/dashboard/admin/scholarship',
+        icon: Gift,
+        children: [
+          { label: 'All Scholarships', href: '/dashboard/admin/scholarship', icon: Gift },
+          { label: 'Statistics', href: '/dashboard/admin/scholarship/stats', icon: BarChart3 },
+        ],
+      },
     ],
   },
   {
@@ -204,10 +215,18 @@ export default function AdminSidebar() {
       <div className="border-t border-gray-800">
         {/* User strip */}
         <div className="flex items-center gap-3 p-4">
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-300 shrink-0">
-            {(user?.firstName?.[0] || '').toUpperCase()}
-            {(user?.lastName?.[0] || '').toUpperCase()}
-          </div>
+          <div className="relative w-9 h-9 shrink-0">
+  <Image
+    src={
+      user?.profileImage ||
+      "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
+    }
+    alt={user?.firstName || "Admin"}
+    fill
+    className="rounded-full object-cover border border-gray-700"
+  />
+</div>
+
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">
               {user?.firstName} {user?.lastName}

@@ -15,8 +15,35 @@ export interface User {
   portfolioUrl?: string
   enrollmentDate?: string
   lastLogin?: string
+   studentProfile?: {
+    cohort?: string;
+    enrollmentDate?: Date;
+    githubProfile?: string;
+    linkedinProfile?: string;
+    portfolioUrl?: string;
+    programId?: string[];
+  courseIds?: string[];
+  };
+
+  instructorProfile?: {
+    bio?: string;
+    coursesTaught?: string
+    linkedinProfile?: string;
+  };
+
+  adminProfile?: {
+    permissions?: string[];
+  };
+
 }
 
+interface ServiceResponse {
+  success: boolean
+  token?: string
+  refreshToken?: string
+  data?: any
+  message?: string
+}
 
 export interface GetAllUsersResponse {
   success: boolean;
@@ -28,7 +55,48 @@ export interface GetAllUsersResponse {
   error?: string;
 }
 
+export interface UserProfileResponse{
+  id: string
+  _id: string
+ firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role: string;
+  status: string;
+  profileImage?: string;
+  phoneNumber?: string;
+  programId?: string[];
+  courseIds?: string[];
+  
 
+  // Role-specific sub-docs
+  studentProfile?: {
+    cohort?: string;
+    enrollmentDate?: Date;
+    githubProfile?: string;
+    linkedinProfile?: string;
+    portfolioUrl?: string;
+    programId?: string[];
+  courseIds?: string[];
+  };
+
+  instructorProfile?: {
+    bio?: string;
+    coursesTaught?: string
+    linkedinProfile?: string;
+  };
+
+  adminProfile?: {
+    permissions?: string[];
+  };
+  lastLogin?: Date;
+
+  createdAt: Date;
+  updatedAt: Date;
+
+
+}
 
 export interface AuthResponse {
   token: string
@@ -49,46 +117,48 @@ export interface RegisterData {
   cohort?: string
 }
 
-// ============= COURSE TYPES (UPDATED) =============
+// ============= COURSE TYPES (UPDATED & CONSISTENT) =============
 
 export interface Course {
   _id: string
-  title: string
-  slug: string
-  description: string
-  coverImage?: string
-  estimatedHours: number
-  
-  objectives: string[]
-  prerequisites: string[]
-  targetAudience: string
-  
   program: {
     _id: string
     title: string
     slug: string
     description?: string
   }
-  
+  category: string
   order: number
+  slug: string
+  title: string
+  description: string
+  estimatedHours: number
+  level: string[] // Array of: "beginner" | "intermediate" | "advanced"
+  objectives: string[]
+  prerequisites: string[]
+  targetAudience: string
+  coverImage?: string
   isPublished: boolean
   approvalStatus: 'pending' | 'approved' | 'rejected'
-  
   completionCriteria: {
     minimumQuizScore: number
     requiredProjects: number
     capstoneRequired: boolean
   }
-  
   currentEnrollment?: number
-  
-  createdBy: {
-    _id: string
-    firstName: string
-    lastName: string
-    email: string
-  }
-  
+  facilitator?: {
+    _id: string,
+    firstName? : string,
+    lastName? : string,
+    email? : string,
+  } | null,
+createdBy?: {
+  _id: string
+  firstName?: string
+  lastName?: string
+  email?: string
+} | null
+
   createdAt: string
   updatedAt: string
 }
@@ -128,6 +198,11 @@ export interface Assessment {
   questions?: Question[]
   passingScore?: number
   timeLimit?: number
+  attempts?: number
+  totalPoints?: number
+  dueDate?: string
+  startDate?: string
+  endDate?: string
   createdAt: string
   updatedAt: string
 }
@@ -138,7 +213,6 @@ export interface Attachment {
   type: string
   size: number
 }
-
 
 export interface Question {
   _id: string
@@ -156,7 +230,7 @@ export interface EnrolledCourse {
   lessonsCompleted: number
   totalLessons: number
   completionDate?: string
-  progress?: Progress | undefined
+  progress?: Progress
 }
 
 export interface AssessmentAttempt {
@@ -190,7 +264,8 @@ export interface CourseCreatePayload {
   program: string
   order?: number
   title: string
-  slug: string
+  slug?: string
+  level?: string[] // ["beginner", "intermediate", "advanced"]
   description: string
   estimatedHours?: number
   objectives?: string[]
@@ -208,6 +283,7 @@ export interface CourseUpdatePayload {
   order?: number
   title?: string
   slug?: string
+  level?: string[]
   description?: string
   estimatedHours?: number
   objectives?: string[]
@@ -256,6 +332,7 @@ export interface Module {
   order: number
   lessons: Lesson[]
   duration: number // in minutes
+  isPublished: boolean
   createdAt: string
   updatedAt: string
 }
@@ -274,7 +351,7 @@ export interface Lesson {
   content: string // Markdown or HTML content
   videoUrl?: string
   duration: number // in minutes
-   isPublished: boolean
+  isPublished: boolean
   order: number
   attachments?: Attachment[]
   createdAt: string
@@ -322,7 +399,7 @@ export interface QuizResult {
 export interface Progress {
   _id: string
   userId: string
-    studentId: string
+  studentId: string
   courseId: string
   completedLessons: string[]
   completedQuizzes: QuizAttempt[]
@@ -365,7 +442,7 @@ export interface AdminAnalytics {
   totalEnrollments: number
   averageCompletionRate: number
   recentEnrollments: Enrollment[]
-  courseStats: CourseStats[]
+  courseStats: CourseStatsAnalytics[]
 }
 
 export interface Enrollment {
@@ -378,10 +455,15 @@ export interface Enrollment {
   progress: Progress
 }
 
-export interface CourseStats {
+export interface CourseStatsAnalytics {
   courseId: string
   courseName: string
-  enrollments: { total: number; active: number; completed: number; completionRate: number; }
+  enrollments: {
+    total: number
+    active: number
+    completed: number
+    completionRate: number
+  }
   completions: number
   averageScore: number
   completionRate: number
@@ -394,6 +476,7 @@ export interface StudentDashboard {
   upcomingQuizzes: Quiz[]
   certificates: Certificate[]
 }
+
 export interface Activity {
   _id: string
   type: 'lesson-completed' | 'quiz-attempted' | 'course-enrolled' | 'certificate-earned'
@@ -403,20 +486,17 @@ export interface Activity {
 }
 
 // ============= API RESPONSES =============
-// types/api.ts
 export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error?: string;
-  message?: string;
-
- // Optional pagination
-  count?: number;
-  total?: number;
-  page?: number;
-  pages?: number;
+  success: boolean
+  data: T
+  error?: string
+  message?: string
+  // Optional pagination
+  count?: number
+  total?: number
+  page?: number
+  pages?: number
 }
-
 
 export interface PaginatedResponse<T> {
   success: boolean
@@ -435,52 +515,60 @@ export interface ApiError {
   errors?: Record<string, string[]>
 }
 
-
-
+// ============= INSTRUCTOR & PROGRAM =============
 export type Instructor = {
   id: string
-  name: string
+  firstName: string
+  lastName: string
+  phoneNumber: string
   avatar: string
   title?: string
   bio?: string
   qualifications?: string[]
   rating?: number
   reviews?: number
+ instructorProfile?: {
+    bio?: string;
+    coursesTaught?: string
+    linkedinProfile?: string;
+  };
   experience?: number
   socials?: { linkedin?: string; twitter?: string; github?: string }
   role?: "instructor"
   isVerified?: boolean
 }
 
-
-
 export interface Program {
-  name: string
-  _id: string;
-  title: string;
-  slug: string;
-  description: string;
-  category?: string;
-  tags?: string[];
-  courses: Course[];
-  order: number;
-  estimatedHours?: number;
-  instructors: Instructor[];
-  coverImage?: string;
-  bannerImage?: string;
-  price?: number;
-  currency?: string;
-  enrollmentLimit?: number;
-  isPublished: boolean;
-  startDate?: string;
-  endDate?: string;
-  isSelfPaced?: boolean;
-  certificateTemplate?: string;
-   approvalStatus: 'pending' | 'approved' | 'rejected';
-  prerequisites?: string[];
-  targetAudience?: string;
-  createdAt: string;
-  updatedAt: string;
+  _id: string
+  title: string
+  name: string // Alias for title
+  slug: string
+  description: string
+  category?: string
+  tags?: string[]
+  courses: Course[]
+  level?: string
+  objectives? : string[];
+  order: number
+  estimatedHours?: number
+  duration?: number // in weeks
+  instructors: Instructor[]
+  coverImage?: string
+  bannerImage?: string
+  price?: number
+  currency?: string
+  enrollmentLimit?: number
+  enrollmentCount?: number
+  isPublished: boolean
+  startDate?: string
+  endDate?: string
+  isSelfPaced?: boolean
+  certificateTemplate?: string
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+  prerequisites?: string[]
+  targetAudience?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface ProgramPayload {
@@ -493,7 +581,27 @@ export interface ProgramPayload {
   currency?: string
   prerequisites?: string[]
   targetAudience?: string
+  estimatedHours?: number
+  duration?: number
 }
 
+// ============= SUBMISSION =============
+export interface Submission {
+  _id: string
+  assessmentId: string
+  studentId: string
+  courseId?: string
+  programId?: string
+  answers: any[]
+  attachments?: string[]
+  score?: number
+  percentage?: number
+  feedback?: string
+  status: 'submitted' | 'graded' | 'returned'
+  attemptNumber: number
+  submittedAt: string
+  gradedAt?: string
+  gradedBy?: string
+}
 
 // ============= END OF FILE =============

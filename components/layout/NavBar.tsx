@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/lib/context/AuthContext'
-import { get } from 'http'
+import { ChevronDown, Zap, Users, Briefcase, BookOpen, Info, Mail, LayoutDashboard, User, Settings, LogOut } from 'lucide-react'
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isProgramsDropdownOpen, setIsProgramsDropdownOpen] = useState(false)
   const router = useRouter()
-  const { user,  logout } = useAuth()
-  const isLoggedIn = !!user
+  const { user, logout, isAuthenticated } = useAuth()
 
   const handleLogout = async () => {
     try {
@@ -27,146 +27,243 @@ export function Navbar() {
     return `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()
   }
 
-  const getDashboardLink = () => {
-  if (!user) return '#'; // fallback
-  switch (user.role) {
-    case 'admin':
-      return '/dashboard/admin';
-    case 'instructor':
-      return '/dashboard/instructor';
-    case 'student':
-    default:
-      return '/dashboard/students';
+  const getProfileImage = () => {
+    return user?.profileImage || null
   }
-};
 
+  const getDashboardLink = () => {
+    if (!user) return '#'
+    switch (user.role) {
+      case 'admin':
+        return '/dashboard/admin'
+      case 'instructor':
+        return '/dashboard/instructor'
+      case 'student':
+      default:
+        return '/dashboard/students'
+    }
+  }
+
+  const getProfileLink = () => {
+    if (!user) return '#'
+    switch (user.role) {
+      case 'admin':
+        return '/profile'
+      case 'instructor':
+        return '/profile'
+      case 'student':
+      default:
+        return '/profile'
+    }
+  }
+
+  const programPaths = [
+    {
+      title: 'Bootcamps',
+      description: 'Intensive AI & Data training',
+      href: '/programs/category/bootcamps',
+      icon: Zap,
+      color: 'lime',
+    },
+    {
+      title: 'Fellowships',
+      description: 'Advanced mentorship programs',
+      href: '/programs/category/fellowships',
+      icon: Users,
+      color: 'emerald',
+    },
+    {
+      title: 'AI Programs',
+      description: 'Specialized AI courses',
+      href: '/programs/category/ai-programs',
+      icon: Briefcase,
+      color: 'yellow',
+    },
+  ]
+
+  // Profile Avatar Component
+  const ProfileAvatar = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
+    const profileImage = getProfileImage()
+    const sizeClasses = {
+      sm: 'w-8 h-8 text-sm',
+      md: 'w-8 h-8 text-sm',
+      lg: 'w-10 h-10 text-base'
+    }
+
+    if (profileImage) {
+      return (
+        <img
+          src={profileImage}
+          alt={`${user?.firstName} ${user?.lastName}`}
+          className={`${sizeClasses[size]} rounded-full object-cover shadow-lg shadow-lime-500/20`}
+        />
+      )
+    }
+
+    return (
+      <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-slate-900 font-semibold shadow-lg shadow-lime-500/20`}>
+        {getInitials()}
+      </div>
+    )
+  }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#2A434E] backdrop-blur-xl border-b border-gray-800">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-xl border-b border-gray-800/50">
       <div className="container-custom">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-lg bg-linear-to-br from-lime-400 to-emerald-500 flex items-center justify-center">
-              <span className="text-black font-bold text-xl">A</span>
+          <Link href="/" className="flex items-center space-x-2.5 group">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-lime-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-lime-500/20">
+              <span className="text-slate-900 font-bold text-lg">A</span>
             </div>
-            <div>
-              <span className="text-lg font-bold text-white hover:text-[#EFB14A]">AI4SID~Academy</span>
-              <span className="text-xs text-gray-500 block hover:text-[#EFB14A]">Innovation Program</span>
+            <div className="hidden sm:block">
+              <span className="text-base font-bold text-white group-hover:text-lime-400 transition-colors">
+                AI4SID Academy
+              </span>
             </div>
           </Link>
-          
+
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-8">
-            <Link 
-              href="/allPrograms" 
-              className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
-            >
-              Program
-            </Link>
-            <Link 
-              href="/curriculum" 
-              className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
-            >
-              Curriculum
-            </Link>
-            <Link 
-              href="/modules" 
-              className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
-            >
-              Modules
-            </Link>
-            <Link 
-              href="/about" 
-              className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
-            >
+          <div className="hidden lg:flex items-center space-x-1">
+            {/* Programs Dropdown */}
+            <div className="relative">
+              <button
+                onMouseEnter={() => setIsProgramsDropdownOpen(true)}
+                onMouseLeave={() => setIsProgramsDropdownOpen(false)}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors"
+              >
+                Programs
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isProgramsDropdownOpen && (
+                <div
+                  onMouseEnter={() => setIsProgramsDropdownOpen(true)}
+                  onMouseLeave={() => setIsProgramsDropdownOpen(false)}
+                  className="absolute top-full left-0 mt-1 w-80 bg-slate-900 border border-gray-800 rounded-xl shadow-2xl overflow-hidden"
+                >
+                  <div className="p-2">
+                    {programPaths.map((program) => {
+                      const Icon = program.icon
+                      const colorClasses = {
+                        lime: 'text-lime-400 bg-lime-500/10',
+                        emerald: 'text-emerald-400 bg-emerald-500/10',
+                        yellow: 'text-yellow-400 bg-yellow-500/10',
+                      }
+                      const colors = colorClasses[program.color as keyof typeof colorClasses]
+
+                      return (
+                        <Link
+                          key={program.href}
+                          href={program.href}
+                          onClick={() => setIsProgramsDropdownOpen(false)}
+                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-800/50 transition-colors group"
+                        >
+                          <div className={`p-2 rounded-lg ${colors}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-white group-hover:text-lime-400 transition-colors">
+                              {program.title}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {program.description}
+                            </p>
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                  <div className="border-t border-gray-800 p-2">
+                    <Link
+                      href="/allPrograms"
+                      onClick={() => setIsProgramsDropdownOpen(false)}
+                      className="block px-3 py-2 text-sm text-lime-400 hover:bg-slate-800/50 rounded-lg transition-colors text-center font-medium"
+                    >
+                      View All Programs →
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <NavLink href="/about" icon={Info}>
               About
-            </Link>
-            <Link 
-              href="/contact" 
-              className="text-gray-400 hover:text-[#EFB14A] transition-colors duration-200 text-sm font-medium"
-            >
+            </NavLink>
+            <NavLink href="/contact" icon={Mail}>
               Contact
-            </Link>
+            </NavLink>
           </div>
-          
-          {/* Auth Buttons / User Menu */}
-          <div className="hidden lg:flex items-center space-x-3">
-            {isLoggedIn ? (
+
+          {/* Auth Section */}
+          <div className="hidden lg:flex items-center gap-3">
+            {isAuthenticated ? (
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-linear-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-black font-semibold text-sm">
-                    {getInitials()}
+                  <ProfileAvatar size="md" />
+                  <div className="text-left hidden xl:block">
+                    <p className="text-xs font-medium text-white leading-tight">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-[10px] text-gray-500 capitalize">{user?.role}</p>
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-                    <p className="text-xs text-gray-400">{user.role}</p>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* User Dropdown */}
                 {isUserMenuOpen && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setIsUserMenuOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-700">
-                        <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-                        <p className="text-xs text-gray-400">{user.email}</p>
+                    <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-gray-800 rounded-xl shadow-2xl z-20 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-800">
+                        <p className="text-sm font-medium text-white">
+                          {user?.firstName} {user?.lastName}
+                        </p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
                       </div>
-                      <div className="py-2">
-                      {user && (
-  <Link
-    href={getDashboardLink()}
-    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
-    onClick={() => setIsUserMenuOpen(false)}
-  >
-    <span>Dashboard</span>
-  </Link>
-)}
-
+                      <div className="p-1.5">
                         <Link
-                          href="/profile"
-                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                          href={getDashboardLink()}
+                          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/50 hover:text-white rounded-lg transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          <span>Profile</span>
+                          <LayoutDashboard className="w-4 h-4" />
+                          Dashboard
+                        </Link>
+                        <Link
+                          href={getProfileLink()}
+                          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/50 hover:text-white rounded-lg transition-colors"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <User className="w-4 h-4" />
+                          Profile
                         </Link>
                         <Link
                           href="/settings"
-                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+                          className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-slate-800/50 hover:text-white rounded-lg transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span>Settings</span>
+                          <Settings className="w-4 h-4" />
+                          Settings
                         </Link>
                       </div>
-                      <div className="border-t border-gray-700 py-2">
+                      <div className="border-t border-gray-800 p-1.5">
                         <button
                           onClick={() => {
                             setIsUserMenuOpen(false)
                             handleLogout()
                           }}
-                          className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+                          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
-                          <span>Sign Out</span>
+                          <LogOut className="w-4 h-4" />
+                          Sign Out
                         </button>
                       </div>
                     </div>
@@ -176,19 +273,19 @@ export function Navbar() {
             ) : (
               <>
                 <Link href="/auth/login">
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
-                    className="text-gray-400 hover:text-white border-gray-700 hover:border-gray-600"
+                    className="text-gray-300 hover:text-white border border-gray-800 hover:border-gray-700 hover:bg-slate-800/50"
                   >
                     Sign In
                   </Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     size="sm"
-                    className="bg-[#EFB14A] text-black hover:bg-lime-300"
+                    className="bg-gradient-to-r from-lime-400 to-emerald-500 text-slate-900 hover:from-lime-500 hover:to-emerald-600 font-semibold shadow-lg shadow-lime-500/20"
                   >
                     Get Started
                   </Button>
@@ -197,10 +294,10 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-800 transition-colors"
+            className="lg:hidden p-2 rounded-lg hover:bg-slate-800/50 transition-colors"
           >
             <svg
               className="w-6 h-6 text-white"
@@ -229,119 +326,126 @@ export function Navbar() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-gray-800">
-            <div className="flex flex-col space-y-3">
-              {isLoggedIn && (
-                <div className="px-4 py-3 mb-3 bg-gray-800/50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-linear-to-br from-lime-400 to-emerald-500 flex items-center justify-center text-black font-semibold">
-                      {getInitials()}
-                    </div>
+          <div className="lg:hidden py-4 border-t border-gray-800/50">
+            <div className="flex flex-col space-y-1">
+              {isAuthenticated && (
+                <div className="px-4 py-3 mb-3 bg-slate-800/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <ProfileAvatar size="lg" />
                     <div>
-                      <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
-                      <p className="text-xs text-gray-400">{user.email}</p>
+                      <p className="text-sm font-medium text-white">
+                        {user?.firstName} {user?.lastName}
+                      </p>
+                      <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <Link
-                href="/program"
-                className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Program
-              </Link>
-              <Link
-                href="/curriculum"
-                className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Curriculum
-              </Link>
-              <Link
-                href="/modules"
-                className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Modules
-              </Link>
+              {/* Programs Section */}
+              <div className="px-3 py-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Programs
+                </p>
+                {programPaths.map((program) => {
+                  const Icon = program.icon
+                  return (
+                    <Link
+                      key={program.href}
+                      href={program.href}
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors mb-1"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Icon className="w-4 h-4 text-lime-400" />
+                      {program.title}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              <div className="border-t border-gray-800/50 my-2" />
+
               <Link
                 href="/about"
-                className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
+                <Info className="w-4 h-4" />
                 About
               </Link>
               <Link
                 href="/contact"
-                className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
+                <Mail className="w-4 h-4" />
                 Contact
               </Link>
 
-              {isLoggedIn ? (
+              {isAuthenticated ? (
                 <>
-                  <div className="pt-3 border-t border-gray-800">
-                    <Link
-                      href={getDashboardLink()}
-                      className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium block"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      href="/profile"
-                      className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium block"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      href="/settings"
-                      className="text-gray-400 hover:text-lime-400 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium block"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Settings
-                    </Link>
-                  </div>
-                  <div className="pt-3 border-t border-gray-800">
-                    <button
-                      onClick={() => {
-                        setIsMenuOpen(false)
-                        handleLogout()
-                      }}
-                      className="w-full text-left text-red-400 hover:text-red-300 py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
+                  <div className="border-t border-gray-800/50 my-2" />
+                  <Link
+                    href={getDashboardLink()}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    href={getProfileLink()}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User className="w-4 h-4" />
+                    Profile
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      handleLogout()
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors mt-1"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
                 </>
               ) : (
-                <div className="pt-3 space-y-2 border-t border-gray-800">
-                
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      fullWidth
-                      className="text-gray-400 border-gray-700"
-                       onClick={() => router.push('/auth/login')}
-                    >
-                      Sign In
-                    </Button>
-               
-             
-                    <Button 
-                      variant="primary" 
-                      size="sm" 
-                      fullWidth
-                      className="bg-lime-400 text-black hover:bg-lime-300"
-                       onClick={() => router.push('/auth/register')}
-                    >
-                      Get Started
-                    </Button>
-                
+                <div className="px-3 pt-3 space-y-2 border-t border-gray-800/50 mt-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    fullWidth
+                    className="text-gray-300 border border-gray-800 hover:bg-slate-800/50"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      router.push('/auth/login')
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    className="bg-gradient-to-r from-lime-400 to-emerald-500 text-slate-900 hover:from-lime-500 hover:to-emerald-600 font-semibold"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      router.push('/auth/register')
+                    }}
+                  >
+                    Get Started
+                  </Button>
                 </div>
               )}
             </div>
@@ -349,5 +453,26 @@ export function Navbar() {
         )}
       </div>
     </nav>
+  )
+}
+
+// Helper component for nav links
+function NavLink({
+  href,
+  icon: Icon,
+  children,
+}: {
+  href: string
+  icon: any
+  children: React.ReactNode
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors"
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {children}
+    </Link>
   )
 }

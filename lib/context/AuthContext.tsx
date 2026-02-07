@@ -29,18 +29,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter()
 
   const getDashboardRoute = (role: string) => {
-  switch (role) {
-    case 'student':
-      return '/dashboard/students'
-    case 'admin':
-      return '/dashboard/admin'
-    case 'instructor':
-      return '/dashboard/instructor'
-    default:
-      return '/'
+    switch (role) {
+      case 'student':
+        return '/dashboard/students'
+      case 'admin':
+        return '/dashboard/admin'
+      case 'instructor':
+        return '/dashboard/instructor'
+      default:
+        return '/'
+    }
   }
-}
-
 
   const clearAuthStorage = useCallback(() => {
     authService.clearTokens()
@@ -53,34 +52,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const token = authService.getToken()
       
-     if (!token) {
-  if (isLoggingInRef.current) {
-    console.log('⏳ Skipping refreshUser during login')
-    return
-  }
+      if (!token) {
+        if (isLoggingInRef.current) {
+          console.log('⏳ Skipping refreshUser during login')
+          return
+        }
 
-  console.log('📭 No auth token found')
-  setUser(null)
-  setLoading(false)
-  return
-}
-
+        console.log('📭 No auth token found')
+        setUser(null)
+        setLoading(false)
+        return
+      }
 
       console.log('🔄 Refreshing user data...')
+      
+      // Call getMe with better error handling
       const response = await authService.getMe()
       
       console.log('📦 getMe response:', response)
       
-      if (response.success && response.data && Object.keys(response.data).length > 0) {
-        console.log('✅ User authenticated:', response.data)
-        setUser(response.data as User)
-      } else {
-        console.log('❌ Invalid user data, clearing auth')
+      // Check if response has the expected structure
+      if (!response) {
+        console.error('❌ No response from getMe')
         clearAuthStorage()
+        setLoading(false)
+        return
+      }
+
+      // Handle successful response
+      if (response.success && response.data) {
+        // Verify data is not empty
+        if (Object.keys(response.data).length > 0) {
+          console.log('✅ User authenticated:', response.data)
+          setUser(response.data as User)
+        } else {
+          console.log('❌ Empty user data received')
+          clearAuthStorage()
+        }
+      } else {
+        // Handle unsuccessful response
+        console.log('❌ Invalid response structure:', response)
+        
+        // Check if it's an auth error
+        if (response.message?.includes('401') || 
+            response.message?.includes('Unauthorized') || 
+            response.message?.includes('Not authorized')) {
+          console.log('🔒 Authentication error - clearing tokens')
+          clearAuthStorage()
+        }
       }
     } catch (err: any) {
-      console.error('❌ Error refreshing user:', err.message)
-      if (err.message?.includes('401') || err.message?.includes('Unauthorized') || err.message?.includes('Not authorized')) {
+      console.error('❌ Error in refreshUser:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+      })
+      
+      // Check if it's an auth error
+      const errorMessage = err.message || err.toString()
+      if (errorMessage.includes('401') || 
+          errorMessage.includes('Unauthorized') || 
+          errorMessage.includes('Not authorized') ||
+          errorMessage.includes('No authentication token')) {
+        console.log('🔒 Auth error detected - clearing storage')
         clearAuthStorage()
       }
     } finally {
@@ -117,32 +151,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [clearAuthStorage, refreshUser])
 
+  const login = useCallback(async (email: string, password: string) => {
+    setLoading(true)
+    isLoggingInRef.current = true
 
-const login = useCallback(async (email: string, password: string) => {
-  setLoading(true)
-  isLoggingInRef.current = true
+    try {
+      const response = await authService.login({ email, password })
 
-  try {
-    const response = await authService.login({ email, password })
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Login failed')
+      }
 
-    if (!response.success || !response.data) {
-      throw new Error(response.message || 'Login failed')
+      const loggedInUser = response.data as User
+      setUser(loggedInUser)
+
+      // Role-based navigation
+      const route = getDashboardRoute(loggedInUser.role)
+      router.replace(route)
+
+    } catch (err: any) {
+      console.error('❌ Login error:', err)
+      throw err
+    } finally {
+      isLoggingInRef.current = false
+      setLoading(false)
     }
-
-    const loggedInUser = response.data as User
-    setUser(loggedInUser)
-
-    // ✅ ROLE-BASED NAVIGATION HERE
-    const route = getDashboardRoute(loggedInUser.role)
-    router.replace(route)
-
-  } finally {
-    isLoggingInRef.current = false
-    setLoading(false)
-  }
-}, [])
-
-
+  }, [router])
 
   const register = useCallback(async (data: RegisterData) => {
     if (typeof window === 'undefined') return
@@ -156,7 +190,7 @@ const login = useCallback(async (email: string, password: string) => {
       console.log('📦 Registration response:', response)
 
       if (!response.success) {
-        throw new Error(response.error || 'Registration failed')
+        throw new Error(response.message || 'Registration failed')
       }
 
       if (!response.data) {
@@ -166,7 +200,6 @@ const login = useCallback(async (email: string, password: string) => {
       const userData = response.data as User
       console.log('✅ Registration successful:', userData)
       setUser(userData)
-
 
     } catch (err: any) {
       console.error('❌ Registration error:', err)
@@ -194,14 +227,28 @@ const login = useCallback(async (email: string, password: string) => {
   const updateProfile = useCallback(async (data: any) => {
     if (typeof window === 'undefined') return
 
-    const response = await authService.updateProfile(data)
-    
-    if (response.success && response.data) {
-      setUser(prev => (prev ? { ...prev, ...response.data } : response.data as User))
-    } else {
-      throw new Error('Failed to update profile')
+    try {
+      console.log('📝 Updating profile...')
+      const response = await authService.updateProfile(data)
+      
+      console.log('📦 Update profile response:', response)
+      
+      if (response.success && response.data) {
+        console.log('✅ Profile updated, refreshing user data...')
+        
+        // Update local user state immediately
+        setUser(prev => (prev ? { ...prev, ...response.data } : response.data as User))
+        
+        // Also refresh from server to ensure we have latest data
+        await refreshUser()
+      } else {
+        throw new Error(response.message || 'Failed to update profile')
+      }
+    } catch (err: any) {
+      console.error('❌ Update profile error:', err)
+      throw err
     }
-  }, [])
+  }, [refreshUser])
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (typeof window === 'undefined') return

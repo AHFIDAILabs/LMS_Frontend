@@ -38,6 +38,17 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Learning',
     items: [
+
+       {
+        label: 'My Programs',
+        href: '/dashboard/students/myProgram',
+        icon: BookOpen,
+        children: [
+          { label: 'All Programs', href: '/programs', icon: BookOpen },
+          { label: 'In Progress', href: '/program/in-progress', icon: BookOpen },
+          { label: 'Completed', href: '/program/completed', icon: BookOpen },
+        ],
+      },
       {
         label: 'My Courses',
         href: '/courses',
