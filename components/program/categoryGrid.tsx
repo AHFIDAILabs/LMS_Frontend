@@ -117,7 +117,7 @@ export const CategoryGrid = ({
         'Industry certifications',
         'Lifetime access'
       ],
-      href: '/programs/category/categoryLandingPage'
+      href: '/programs/[category]'
     }
   ]
 
