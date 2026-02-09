@@ -20,9 +20,17 @@ export const useInstructor = () => {
   }, []);
 
 
-   const createCourse = () => {
+const createCourse = () => {
   return async (data: Parameters<typeof instructorService.createCourse>[0]) => {
-    if (!data.programId) throw new Error('Program ID is required to create a course');
+    // Type guard to check programId exists
+    const programId = data instanceof FormData 
+      ? data.get('programId') 
+      : data.programId;
+    
+    if (!programId) {
+      throw new Error('Program ID is required to create a course');
+    }
+    
     const res = await instructorService.createCourse(data);
     return res.data;
   };
