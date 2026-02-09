@@ -13,7 +13,8 @@ interface CategoryLandingPageProps {
   category: 'bootcamps' | 'fellowships' | 'ai-programs'
 }
 
-export const CategoryLandingPage = ({ category }: CategoryLandingPageProps) => {
+export default function Page({ params }: { params: { category: string } }) {
+  const category = params.category as 'bootcamps' | 'fellowships' | 'ai-programs'
   
   // Map category to API format
   const categoryMap = {
