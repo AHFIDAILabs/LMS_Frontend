@@ -346,12 +346,12 @@ export default function AdminCoursesPage() {
 
                       {/* Metadata */}
                       <div className="flex flex-wrap gap-4 text-sm text-gray-400">
-                        {course.facilitator && (
+                        {course.instructor && (
                           <span className="flex items-center gap-1">
                             <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs">
-                              {course.facilitator?.firstName}{course.facilitator?.lastName}
+                              {course.instructor?.firstName}{course.instructor?.lastName}
                             </span>
-                            {course.facilitator?.firstName} {course.facilitator?.lastName}
+                            {course.instructor?.firstName} {course.instructor?.lastName}
                           </span>
                         )}
                         

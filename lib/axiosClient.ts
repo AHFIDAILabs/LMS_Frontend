@@ -32,8 +32,13 @@ axiosClient.interceptors.response.use(
       try {
         if (typeof window === 'undefined') throw new Error('No refresh token on server')
 
+            if (error.response?.status === 429) {
+      await new Promise(r => setTimeout(r, 1000))
+      return axiosClient.request(error.config)
+    }
         const refreshToken = localStorage.getItem('refreshToken')
         if (!refreshToken) throw new Error('No refresh token found')
+
 
         const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken }, { withCredentials: true })
         const newToken = res.data.accessToken
@@ -41,6 +46,7 @@ axiosClient.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return axiosClient(originalRequest)
+        
       } catch (err) {
         localStorage.removeItem('authToken')
         localStorage.removeItem('refreshToken')

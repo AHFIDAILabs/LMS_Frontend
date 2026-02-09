@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { courseService } from '@/services/courseService'
+import { Course, CourseModule, Lesson } from '@/types'
 import {
   Book,
   ArrowLeft,
@@ -19,67 +20,27 @@ import {
   PlayCircle,
   FileText,
   Calendar,
-  User,
+  Code,
+  Video,
+  BookText,
+  ListChecks,
+  FolderKanban,
 } from 'lucide-react'
 import Link from 'next/link'
 
-interface Lesson {
-  _id: string
-  title: string
-  description: string
-  type: 'video' | 'text' | 'quiz' | 'assignment'
-  duration?: number
-  order: number
-  isPublished: boolean
-}
-
-interface Module {
-  _id: string
-  title: string
-  description: string
-  order: number
-  lessons: Lesson[]
-}
-
-interface CourseDetail {
-  _id: string
-  title: string
-  description: string
-  category: string
-  level: string
-  isPublished: boolean
-  isApproved?: boolean
-  instructor?: {
-    _id: string
-    firstName: string
-    lastName: string
-    email: string
-  }
-  program?: {
-    _id: string
-    name: string
-  }
-  thumbnail?: string
-  duration?: number
-  enrollmentCount?: number
-  modules?: Module[]
-  requirements?: string[]
-  learningOutcomes?: string[]
-  createdAt: string
-  updatedAt: string
-}
-
-const LEVEL_STYLES: Record<string, string> = {
+const LEVEL_COLORS: Record<string, string> = {
   beginner: 'bg-green-500/20 text-green-400 border-green-500/30',
   intermediate: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   advanced: 'bg-red-500/20 text-red-400 border-red-500/30',
 }
 
-const LESSON_TYPE_ICONS = {
-  video: PlayCircle,
-  text: FileText,
-  quiz: CheckCircle,
-  assignment: BookOpen,
+const LESSON_TYPE_ICONS: Record<string, any> = {
+  video: Video,
+  reading: BookText,
+  coding: Code,
+  workshop: Users,
+  project: FolderKanban,
+  quiz: ListChecks,
 }
 
 export default function AdminCourseDetailPage() {
@@ -88,7 +49,8 @@ export default function AdminCourseDetailPage() {
   const courseId = params?.id as string
   const { user, isAuthenticated, loading: authLoading } = useAuth()
   
-  const [course, setCourse] = useState<CourseDetail | null>(null)
+  const [course, setCourse] = useState<Course | null>(null)
+  const [modules, setModules] = useState<CourseModule[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -111,19 +73,19 @@ export default function AdminCourseDetailPage() {
       const courseResponse = await courseService.getCourseById(courseId)
       
       if (courseResponse.success && courseResponse.data) {
-        const courseData = courseResponse.data as CourseDetail
+        const courseData = courseResponse.data as Course
+        setCourse(courseData)
         
         // Fetch course content (modules and lessons)
         try {
           const contentResponse = await courseService.getCourseContent(courseId)
           if (contentResponse.success && contentResponse.data) {
-            courseData.modules = (contentResponse.data as any).modules || []
+            setModules((contentResponse.data as any).modules || [])
           }
         } catch (err) {
           console.log('Could not fetch course content:', err)
+          setModules([])
         }
-        
-        setCourse(courseData)
       } else {
         setError(courseResponse.error || 'Failed to fetch course details')
       }
@@ -147,6 +109,21 @@ export default function AdminCourseDetailPage() {
       month: 'long',
       day: 'numeric',
     })
+  }
+
+  const calculateTotalLessons = () => {
+    return modules.reduce((total, module) => {
+      return total + (module.lessons?.length || 0)
+    }, 0)
+  }
+
+  const calculateTotalDuration = () => {
+    return modules.reduce((total, module) => {
+      const moduleDuration = module.lessons?.reduce((sum, lesson) => {
+        return sum + (lesson.duration || 0)
+      }, 0) || 0
+      return total + moduleDuration
+    }, 0)
   }
 
   if (authLoading || loading) {
@@ -180,7 +157,8 @@ export default function AdminCourseDetailPage() {
     )
   }
 
-  const totalLessons = course.modules?.reduce((acc, mod) => acc + (mod.lessons?.length || 0), 0) || 0
+  const totalLessons = calculateTotalLessons()
+  const totalDuration = calculateTotalDuration()
 
   return (
     <div className="min-h-screen bg-slate-900 flex">
@@ -199,10 +177,10 @@ export default function AdminCourseDetailPage() {
           {/* Course Header */}
           <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
             {/* Hero Image */}
-            <div className="relative h-64 bg-linear-to-br from-slate-700 to-slate-900">
-              {course.thumbnail ? (
+            <div className="relative h-64 bg-gradient-to-br from-slate-700 to-slate-900">
+              {course.coverImage ? (
                 <img
-                  src={course.thumbnail}
+                  src={course.coverImage}
                   alt={course.title}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -232,6 +210,19 @@ export default function AdminCourseDetailPage() {
                     </span>
                   )}
                 </span>
+
+                {/* Approval Status Badge */}
+                {course.approvalStatus && (
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold border backdrop-blur-sm ${
+                    course.approvalStatus === 'approved' 
+                      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                      : course.approvalStatus === 'rejected'
+                      ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                      : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                  }`}>
+                    {course.approvalStatus.charAt(0).toUpperCase() + course.approvalStatus.slice(1)}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -241,10 +232,22 @@ export default function AdminCourseDetailPage() {
                 <div className="flex-1">
                   <h1 className="text-3xl font-bold text-white mb-2">{course.title}</h1>
                   <p className="text-gray-400 text-lg">{course.description}</p>
+                  
+                  {/* Category and Order */}
+                  <div className="flex items-center gap-4 mt-3">
+                    {course.category && (
+                      <span className="text-sm text-gray-500">
+                        Category: <span className="text-gray-300">{course.category}</span>
+                      </span>
+                    )}
+                    <span className="text-sm text-gray-500">
+                      Order: <span className="text-gray-300">#{course.order}</span>
+                    </span>
+                  </div>
                 </div>
                 
                 <Link
-                  href={`/admin/courses/${course._id}/edit`}
+                  href={`/dashboard/admin/courses/${course._id}/edit`}
                   className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors"
                 >
                   <Edit size={18} />
@@ -260,7 +263,7 @@ export default function AdminCourseDetailPage() {
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Enrolled</p>
-                    <p className="text-white font-semibold">{course.enrollmentCount || 0}</p>
+                    <p className="text-white font-semibold">{course.currentEnrollment || 0}</p>
                   </div>
                 </div>
 
@@ -270,7 +273,9 @@ export default function AdminCourseDetailPage() {
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Duration</p>
-                    <p className="text-white font-semibold">{formatDuration(course.duration)}</p>
+                    <p className="text-white font-semibold">
+                      {course.estimatedHours ? `${course.estimatedHours}h` : formatDuration(totalDuration)}
+                    </p>
                   </div>
                 </div>
 
@@ -286,22 +291,40 @@ export default function AdminCourseDetailPage() {
 
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    course.level === 'beginner' ? 'bg-green-500/20' :
-                    course.level === 'intermediate' ? 'bg-yellow-500/20' :
-                    'bg-red-500/20'
+                    course.level?.includes('beginner') ? 'bg-green-500/20' :
+                    course.level?.includes('advanced') ? 'bg-red-500/20' :
+                    'bg-yellow-500/20'
                   }`}>
                     <Award className={
-                      course.level === 'beginner' ? 'text-green-400' :
-                      course.level === 'intermediate' ? 'text-yellow-400' :
-                      'text-red-400'
+                      course.level?.includes('beginner') ? 'text-green-400' :
+                      course.level?.includes('advanced') ? 'text-red-400' :
+                      'text-yellow-400'
                     } size={20} />
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Level</p>
-                    <p className="text-white font-semibold capitalize">{course.level}</p>
+                    <p className="text-white font-semibold capitalize">
+                      {course.level && Array.isArray(course.level) ? course.level.join(', ') : 'N/A'}
+                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Level Badges */}
+              {course.level && Array.isArray(course.level) && course.level.length > 0 && (
+                <div className="flex gap-2 mt-4">
+                  {course.level.map((lvl) => (
+                    <span
+                      key={lvl}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                        LEVEL_COLORS[lvl] || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                      }`}
+                    >
+                      {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -309,14 +332,19 @@ export default function AdminCourseDetailPage() {
             {/* Main Content - Modules & Lessons */}
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Book size={24} className="text-lime-400" />
-                  Course Content
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Book size={24} className="text-lime-400" />
+                    Course Content
+                  </h2>
+                  <div className="text-sm text-gray-400">
+                    {modules.length} modules • {totalLessons} lessons
+                  </div>
+                </div>
 
-                {course.modules && course.modules.length > 0 ? (
+                {modules && modules.length > 0 ? (
                   <div className="space-y-4">
-                    {course.modules
+                    {modules
                       .sort((a, b) => a.order - b.order)
                       .map((module, moduleIndex) => (
                         <div
@@ -325,15 +353,23 @@ export default function AdminCourseDetailPage() {
                         >
                           {/* Module Header */}
                           <div className="bg-slate-700/50 p-4">
-                            <h3 className="text-lg font-semibold text-white">
-                              Module {moduleIndex + 1}: {module.title}
-                            </h3>
-                            {module.description && (
-                              <p className="text-gray-400 text-sm mt-1">{module.description}</p>
-                            )}
-                            <p className="text-gray-500 text-xs mt-2">
-                              {module.lessons?.length || 0} lessons
-                            </p>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-white">
+                                  Module {moduleIndex + 1}: {module.title}
+                                </h3>
+                                {module.description && (
+                                  <p className="text-gray-400 text-sm mt-1">{module.description}</p>
+                                )}
+                                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                  <span>{module.lessons?.length || 0} lessons</span>
+                                  {module.duration && <span>{formatDuration(module.duration)}</span>}
+                                  {!module.isPublished && (
+                                    <span className="text-yellow-400">• Draft</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Lessons List */}
@@ -341,7 +377,7 @@ export default function AdminCourseDetailPage() {
                             <div className="divide-y divide-gray-700">
                               {module.lessons
                                 .sort((a, b) => a.order - b.order)
-                                .map((lesson, lessonIndex) => {
+                                .map((lesson: Lesson, lessonIndex) => {
                                   const LessonIcon = LESSON_TYPE_ICONS[lesson.type] || FileText
                                   
                                   return (
@@ -359,23 +395,26 @@ export default function AdminCourseDetailPage() {
                                             <h4 className="text-white font-medium">
                                               {lessonIndex + 1}. {lesson.title}
                                             </h4>
-                                            {!lesson.isPublished && (
-                                              <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded">
-                                                Draft
-                                              </span>
-                                            )}
                                           </div>
                                           
-                                          {lesson.description && (
-                                            <p className="text-gray-400 text-sm mt-1">
-                                              {lesson.description}
-                                            </p>
-                                          )}
-                                          
                                           <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                                            <span className="capitalize">{lesson.type}</span>
+                                            <span className="capitalize flex items-center gap-1">
+                                              <LessonIcon size={12} />
+                                              {lesson.type}
+                                            </span>
                                             {lesson.duration && (
                                               <span>{formatDuration(lesson.duration)}</span>
+                                            )}
+                                            {!lesson.isPublished && (
+                                              <span className="text-yellow-400">• Draft</span>
+                                            )}
+                                            {lesson.videoUrl && (
+                                              <span className="text-blue-400">• Has video</span>
+                                            )}
+                                            {lesson.attachments && lesson.attachments.length > 0 && (
+                                              <span className="text-purple-400">
+                                                • {lesson.attachments.length} attachment(s)
+                                              </span>
                                             )}
                                           </div>
                                         </div>
@@ -383,6 +422,13 @@ export default function AdminCourseDetailPage() {
                                     </div>
                                   )
                                 })}
+                            </div>
+                          )}
+
+                          {/* No lessons */}
+                          {(!module.lessons || module.lessons.length === 0) && (
+                            <div className="p-4 text-center text-gray-500 text-sm">
+                              No lessons in this module yet
                             </div>
                           )}
                         </div>
@@ -399,27 +445,27 @@ export default function AdminCourseDetailPage() {
                 )}
               </div>
 
-              {/* Learning Outcomes */}
-              {course.learningOutcomes && course.learningOutcomes.length > 0 && (
+              {/* Learning Objectives */}
+              {course.objectives && Array.isArray(course.objectives) && course.objectives.length > 0 && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Learning Outcomes</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">Learning Objectives</h2>
                   <ul className="space-y-2">
-                    {course.learningOutcomes.map((outcome, index) => (
+                    {course.objectives.map((objective, index) => (
                       <li key={index} className="flex items-start gap-3 text-gray-300">
                         <CheckCircle size={20} className="text-lime-400 shrink-0 mt-0.5" />
-                        <span>{outcome}</span>
+                        <span>{objective}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* Requirements */}
-              {course.requirements && course.requirements.length > 0 && (
+              {/* Prerequisites */}
+              {course.prerequisites && Array.isArray(course.prerequisites) && course.prerequisites.length > 0 && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Requirements</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">Prerequisites</h2>
                   <ul className="space-y-2">
-                    {course.requirements.map((req, index) => (
+                    {course.prerequisites.map((req, index) => (
                       <li key={index} className="flex items-start gap-3 text-gray-300">
                         <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0 mt-2" />
                         <span>{req}</span>
@@ -428,25 +474,82 @@ export default function AdminCourseDetailPage() {
                   </ul>
                 </div>
               )}
+
+              {/* Completion Criteria */}
+              {course.completionCriteria && (
+                <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+                  <h2 className="text-xl font-bold text-white mb-4">Completion Criteria</h2>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">Minimum Quiz Score</span>
+                      <span className="text-white font-semibold">
+                        {course.completionCriteria.minimumQuizScore}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">Required Projects</span>
+                      <span className="text-white font-semibold">
+                        {course.completionCriteria.requiredProjects}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">Capstone Required</span>
+                      <span className={`font-semibold ${
+                        course.completionCriteria.capstoneRequired ? 'text-lime-400' : 'text-gray-400'
+                      }`}>
+                        {course.completionCriteria.capstoneRequired ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sidebar - Course Details */}
             <div className="space-y-6">
-              {/* Instructor Info */}
-              {course.instructor && (
+              {/* Program Info */}
+              {course.program && course.program._id && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">Instructor</h3>
+                  <h3 className="text-lg font-bold text-white mb-4">Program</h3>
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
+                      <Award className="text-blue-400" size={24} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium">{course.program.title || 'Untitled Program'}</p>
+                      {course.program.description && (
+                        <p className="text-gray-400 text-sm mt-1 line-clamp-2">
+                          {course.program.description}
+                        </p>
+                      )}
+                      <Link
+                        href={`/dashboard/admin/programs/${course.program._id}`}
+                        className="text-blue-400 hover:text-blue-300 text-sm mt-2 inline-block"
+                      >
+                        View Program →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Created By Info */}
+              {course.createdBy && course.createdBy._id && (
+                <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-white mb-4">Created By</h3>
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-full bg-linear-to-br from-lime-500 to-lime-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
-                      {course.instructor.firstName[0]}{course.instructor.lastName[0]}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                      {course.createdBy.firstName?.[0] || 'U'}{course.createdBy.lastName?.[0] || 'U'}
                     </div>
                     <div className="flex-1">
                       <h4 className="text-white font-semibold">
-                        {course.instructor.firstName} {course.instructor.lastName}
+                        {course.createdBy.firstName || 'Unknown'} {course.createdBy.lastName || 'User'}
                       </h4>
-                      <p className="text-gray-400 text-sm mt-1">{course.instructor.email}</p>
+                      {course.createdBy.email && (
+                        <p className="text-gray-400 text-sm mt-1">{course.createdBy.email}</p>
+                      )}
                       <Link
-                        href={`/admin/users/${course.instructor._id}`}
+                        href={`/dashboard/admin/users/${course.createdBy._id}`}
                         className="text-lime-400 hover:text-lime-300 text-sm mt-2 inline-block"
                       >
                         View Profile →
@@ -456,24 +559,39 @@ export default function AdminCourseDetailPage() {
                 </div>
               )}
 
-              {/* Program Info */}
-              {course.program && (
+              {/* Instructor Info */}
+              {course.instructor && course.instructor._id && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">Program</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
-                      <Award className="text-blue-400" size={24} />
+                  <h3 className="text-lg font-bold text-white mb-4">Instructor</h3>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                      {course.instructor.firstName?.[0] || 'I'}{course.instructor.lastName?.[0] || 'I'}
                     </div>
                     <div className="flex-1">
-                      <p className="text-white font-medium">{course.program.name}</p>
+                      <h4 className="text-white font-semibold">
+                        {course.instructor.firstName || 'Unknown'} {course.instructor.lastName || 'Instructor'}
+                      </h4>
+                      {course.instructor.email && (
+                        <p className="text-gray-400 text-sm mt-1">{course.instructor.email}</p>
+                      )}
                       <Link
-                        href={`/admin/programs/${course.program._id}`}
-                        className="text-blue-400 hover:text-blue-300 text-sm mt-1 inline-block"
+                        href={`/dashboard/admin/users/${course.instructor._id}`}
+                        className="text-purple-400 hover:text-purple-300 text-sm mt-2 inline-block"
                       >
-                        View Program →
+                        View Profile →
                       </Link>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Target Audience */}
+              {course.targetAudience && (
+                <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-white mb-3">Target Audience</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    {course.targetAudience}
+                  </p>
                 </div>
               )}
 
@@ -497,15 +615,21 @@ export default function AdminCourseDetailPage() {
                     </div>
                   </div>
                   
-                  {course.category && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Book className="text-gray-500" size={18} />
-                      <div>
-                        <p className="text-gray-500">Category</p>
-                        <p className="text-white">{course.category}</p>
-                      </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Book className="text-gray-500" size={18} />
+                    <div>
+                      <p className="text-gray-500">Slug</p>
+                      <p className="text-white font-mono text-xs">{course.slug}</p>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex items-center gap-3 text-sm">
+                    <Award className="text-gray-500" size={18} />
+                    <div>
+                      <p className="text-gray-500">Modules</p>
+                      <p className="text-white">{modules.length}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

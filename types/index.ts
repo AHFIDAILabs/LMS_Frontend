@@ -136,6 +136,7 @@ export interface Course {
   level: string[] // Array of: "beginner" | "intermediate" | "advanced"
   objectives: string[]
   prerequisites: string[]
+  modules: string[]
   targetAudience: string
   coverImage?: string
   isPublished: boolean
@@ -146,7 +147,7 @@ export interface Course {
     capstoneRequired: boolean
   }
   currentEnrollment?: number
-  facilitator?: {
+  instructor?: {
     _id: string,
     firstName? : string,
     lastName? : string,
@@ -179,6 +180,7 @@ export interface CourseModule {
   title: string
   description: string
   order: number
+  duration: number
   isPublished: boolean
   lessons?: Lesson[]
   assessments?: Assessment[]
@@ -347,6 +349,7 @@ export interface ModuleCreate {
 export interface Lesson {
   _id: string
   moduleId: string
+  type: string
   title: string
   content: string // Markdown or HTML content
   videoUrl?: string

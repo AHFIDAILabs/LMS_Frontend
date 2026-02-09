@@ -2,31 +2,31 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import InstructorSidebar from '@/components/dashboard/InstructorSide'
-import { lessonService } from '@/services/lessonService'
 import { moduleService } from '@/services/moduleService'
-import AddLessonModal from '@/components/modals/AddLessonModal'
-import EditLessonModal from '@/components/modals/EditLessonModal'
+import { lessonService } from '@/services/lessonService'
 import {
   ArrowLeft,
   Plus,
   BookOpen,
+  Clock,
+  CheckCircle,
+  AlertCircle,
   Edit,
   Trash2,
   Eye,
   EyeOff,
-  GripVertical,
-  Clock,
-  CheckCircle,
-  AlertCircle,
   Play,
   FileText,
   Code,
   PenTool,
+  GripVertical,
 } from 'lucide-react'
+import AddLessonModal from '@/components/modals/AddLessonModal'
+import EditLessonModal from '@/components/modals/EditLessonModal'
+import EditModuleModal from '@/components/modals/EditModuleModal'
 
-export default function ManageLessonsPage() {
+export default function ModuleDetailPage() {
   const params = useParams()
   const router = useRouter()
   const courseId = params?.courseId as string
@@ -37,8 +37,9 @@ export default function ManageLessonsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [showAddModal, setShowAddModal] = useState(false)
+  const [showAddLessonModal, setShowAddLessonModal] = useState(false)
   const [editingLesson, setEditingLesson] = useState<any>(null)
+  const [showEditModuleModal, setShowEditModuleModal] = useState(false)
 
   // Fetch module and lessons
   const fetchData = async () => {
@@ -48,18 +49,18 @@ export default function ManageLessonsPage() {
 
       const [moduleRes, lessonsRes] = await Promise.all([
         moduleService.getModule(moduleId),
-        lessonService.getLessonsByModule(moduleId, true), // Include unpublished
+        lessonService.getLessonsByModule(moduleId, true),
       ])
 
       if (moduleRes.success && lessonsRes.success) {
         setModule(moduleRes.data.module || moduleRes.data)
         setLessons(lessonsRes.data)
       } else {
-        setError('Failed to load lessons')
+        setError('Failed to load module')
       }
     } catch (err: any) {
       console.error(err)
-      setError(err.message || 'Failed to load lessons')
+      setError(err.message || 'Failed to load module')
     } finally {
       setLoading(false)
     }
@@ -71,8 +72,20 @@ export default function ManageLessonsPage() {
     }
   }, [moduleId])
 
+  // Toggle module publish status
+  const handleToggleModulePublish = async () => {
+    try {
+      const res = await moduleService.togglePublish(moduleId)
+      if (res.success) {
+        setModule((prev: any) => ({ ...prev, isPublished: !prev.isPublished }))
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to toggle publish status')
+    }
+  }
+
   // Toggle lesson publish status
-  const handleTogglePublish = async (lessonId: string) => {
+  const handleToggleLessonPublish = async (lessonId: string) => {
     try {
       const res = await lessonService.togglePublish(lessonId)
       if (res.success) {
@@ -88,7 +101,7 @@ export default function ManageLessonsPage() {
   }
 
   // Delete lesson
-  const handleDelete = async (lessonId: string) => {
+  const handleDeleteLesson = async (lessonId: string) => {
     if (
       !confirm(
         'Are you sure you want to delete this lesson? This action cannot be undone.'
@@ -107,6 +120,26 @@ export default function ManageLessonsPage() {
     }
   }
 
+  // Delete module
+  const handleDeleteModule = async () => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this module and all its lessons? This action cannot be undone.'
+      )
+    ) {
+      return
+    }
+
+    try {
+      const res = await moduleService.deleteModule(moduleId)
+      if (res.success) {
+        router.push(`/dashboard/instructor/courses/${courseId}/curriculum`)
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete module')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex">
@@ -114,7 +147,7 @@ export default function ManageLessonsPage() {
         <div className="flex-1 ml-64 flex items-center justify-center">
           <div className="text-center">
             <div className="w-14 h-14 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-400">Loading lessons...</p>
+            <p className="text-gray-400">Loading module...</p>
           </div>
         </div>
       </div>
@@ -129,7 +162,7 @@ export default function ManageLessonsPage() {
           <div className="text-center max-w-md">
             <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <p className="text-red-400 text-lg font-semibold mb-2">
-              Failed to load lessons
+              Failed to load module
             </p>
             <p className="text-gray-500 mb-4">{error}</p>
             <button
@@ -145,7 +178,10 @@ export default function ManageLessonsPage() {
   }
 
   const publishedCount = lessons.filter((l) => l.isPublished).length
-  const totalMinutes = lessons.reduce((sum, l) => sum + (l.estimatedMinutes || 0), 0)
+  const totalMinutes = lessons.reduce(
+    (sum, l) => sum + (l.estimatedMinutes || 0),
+    0
+  )
 
   return (
     <div className="min-h-screen bg-slate-950 flex">
@@ -167,34 +203,90 @@ export default function ManageLessonsPage() {
                 </button>
                 <div>
                   <h1 className="text-lg font-bold text-white">{module.title}</h1>
-                  <p className="text-sm text-gray-500">Manage Lessons</p>
+                  <p className="text-sm text-gray-500">Module Details</p>
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-slate-900 rounded-lg font-semibold transition-colors text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Add Lesson
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowEditModuleModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg font-semibold transition-colors text-sm"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Module
+                </button>
+                <button
+                  onClick={() => setShowAddLessonModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-slate-900 rounded-lg font-semibold transition-colors text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Lesson
+                </button>
+              </div>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center gap-4 mt-4 text-sm">
-              <div className="flex items-center gap-2 text-gray-400">
-                <BookOpen className="w-4 h-4" />
-                <span>
-                  {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
-                </span>
+            {/* Module Info */}
+            <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-gray-800">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm text-gray-300">{module.description}</p>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  {module.isPublished ? (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 text-xs font-semibold">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Published
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 text-xs font-semibold">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Draft
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                <span>{publishedCount} published</span>
+
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <BookOpen className="w-4 h-4" />
+                  <span>
+                    {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>{publishedCount} published</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Clock className="w-4 h-4" />
+                  <span>{totalMinutes} min total</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <Clock className="w-4 h-4" />
-                <span>{totalMinutes} min total</span>
+
+              {/* Module Actions */}
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-800">
+                <button
+                  onClick={handleToggleModulePublish}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg text-sm transition-colors"
+                >
+                  {module.isPublished ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5" />
+                      Unpublish Module
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5" />
+                      Publish Module
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleDeleteModule}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg text-sm transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Module
+                </button>
               </div>
             </div>
           </div>
@@ -202,6 +294,13 @@ export default function ManageLessonsPage() {
 
         {/* Main Content */}
         <main className="p-6">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Lessons</h2>
+            <p className="text-sm text-gray-400">
+              Manage the lessons in this module
+            </p>
+          </div>
+
           {lessons.length === 0 ? (
             <div className="bg-slate-900/50 border border-gray-800 rounded-2xl p-12 text-center">
               <BookOpen className="w-16 h-16 text-gray-600 mx-auto mb-4" />
@@ -211,7 +310,7 @@ export default function ManageLessonsPage() {
                 content, code examples, and assignments.
               </p>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => setShowAddLessonModal(true)}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-400 hover:bg-emerald-500 text-slate-900 rounded-lg font-semibold transition-colors"
               >
                 <Plus className="w-5 h-5" />
@@ -225,9 +324,9 @@ export default function ManageLessonsPage() {
                   key={lesson._id}
                   lesson={lesson}
                   index={index}
-                  onTogglePublish={() => handleTogglePublish(lesson._id)}
+                  onTogglePublish={() => handleToggleLessonPublish(lesson._id)}
                   onEdit={() => setEditingLesson(lesson)}
-                  onDelete={() => handleDelete(lesson._id)}
+                  onDelete={() => handleDeleteLesson(lesson._id)}
                 />
               ))}
             </div>
@@ -236,10 +335,10 @@ export default function ManageLessonsPage() {
       </div>
 
       {/* Modals */}
-      {showAddModal && (
+      {showAddLessonModal && (
         <AddLessonModal
           moduleId={moduleId}
-          onClose={() => setShowAddModal(false)}
+          onClose={() => setShowAddLessonModal(false)}
           onCreated={fetchData}
         />
       )}
@@ -248,6 +347,14 @@ export default function ManageLessonsPage() {
         <EditLessonModal
           lesson={editingLesson}
           onClose={() => setEditingLesson(null)}
+          onUpdated={fetchData}
+        />
+      )}
+
+      {showEditModuleModal && (
+        <EditModuleModal
+          module={module}
+          onClose={() => setShowEditModuleModal(false)}
           onUpdated={fetchData}
         />
       )}

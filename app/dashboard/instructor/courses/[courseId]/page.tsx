@@ -33,27 +33,64 @@ export default function InstructorCourseDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const fetchCourse = async () => {
+    try {
+      setLoading(true)
+      const res = await instructorService.getCourse(courseId)
+      if (res.success) {
+        setData(res.data)
+      } else {
+        setError(res.error || 'Failed to load course')
+      }
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message || 'Failed to load course')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!courseId) return
+    fetchCourse()
+  }, [courseId])
 
-    const fetchCourse = async () => {
-      try {
-        setLoading(true)
-        const res = await instructorService.getCourse(courseId)
-        if (res.success) {
-          setData(res.data)
-        } else {
-          setError(res.error || 'Failed to load course')
-        }
-      } catch (err: any) {
-        console.error(err)
-        setError(err.message || 'Failed to load course')
-      } finally {
-        setLoading(false)
+  // Listen for lesson/module creation events
+  useEffect(() => {
+    const handleLessonCreated = (e: CustomEvent) => {
+      console.log('🎉 Lesson created event received:', e.detail)
+      if (e.detail?.courseId === courseId) {
+        console.log('🔄 Refreshing course data...')
+        fetchCourse()
       }
     }
 
-    fetchCourse()
+    const handleModuleCreated = (e: CustomEvent) => {
+      console.log('🎉 Module created event received:', e.detail)
+      if (e.detail?.courseId === courseId) {
+        console.log('🔄 Refreshing course data...')
+        fetchCourse()
+      }
+    }
+
+    window.addEventListener('lessonCreated' as any, handleLessonCreated)
+    window.addEventListener('moduleCreated' as any, handleModuleCreated)
+
+    return () => {
+      window.removeEventListener('lessonCreated' as any, handleLessonCreated)
+      window.removeEventListener('moduleCreated' as any, handleModuleCreated)
+    }
+  }, [courseId])
+
+  // Refresh data when window gains focus (user comes back to this tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 Window focused, refreshing course data...')
+      fetchCourse()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [courseId])
 
   if (loading) {

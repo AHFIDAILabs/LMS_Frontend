@@ -27,6 +27,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isLoggingInRef = useRef(false)
 
   const router = useRouter()
+  const isRefreshingRef = useRef(false)
+
 
   const getDashboardRoute = (role: string) => {
     switch (role) {
@@ -48,6 +50,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = useCallback(async () => {
     if (typeof window === 'undefined') return
+
+    if (isRefreshingRef.current) {
+    console.log('⏳ refreshUser already running')
+    return
+  }
+
+  isRefreshingRef.current = true
+
 
     try {
       const token = authService.getToken()
@@ -102,26 +112,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     } catch (err: any) {
-      console.error('❌ Error in refreshUser:', {
-        message: err.message,
-        name: err.name,
-        stack: err.stack,
-      })
-      
-      // Check if it's an auth error
-      const errorMessage = err.message || err.toString()
-      if (errorMessage.includes('401') || 
-          errorMessage.includes('Unauthorized') || 
-          errorMessage.includes('Not authorized') ||
-          errorMessage.includes('No authentication token')) {
-        console.log('🔒 Auth error detected - clearing storage')
-        clearAuthStorage()
-      }
-    } finally {
+  const status = err?.response?.status
+
+  console.error('❌ Error in refreshUser:', {
+    status,
+    message: err.message
+  })
+
+  // 🚫 DO NOT LOG OUT ON RATE LIMIT
+  if (status === 429) {
+    console.warn('⏳ Rate limited – keeping user logged in')
+    return
+  }
+
+  // ❌ Only logout on real auth errors
+  if (status === 401 || status === 403) {
+    console.log('🔒 Auth error detected - clearing storage')
+    clearAuthStorage()
+  }  
+ } finally {
+  isRefreshingRef.current = false
       setLoading(false)
       setIsInitialized(true)
     }
   }, [clearAuthStorage])
+
+
+
 
   useEffect(() => {
     if (!isInitialized) {

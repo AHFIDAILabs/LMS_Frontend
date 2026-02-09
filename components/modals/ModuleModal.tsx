@@ -13,37 +13,45 @@ export default function AddModuleModal({ courseId, onClose, onCreated }: any) {
     description: '',
   })
 
-  const create = async () => {
-    // Validate required fields
-    if (!form.title.trim()) {
-      setError('Module title is required')
-      return
-    }
-
-    if (!form.description.trim()) {
-      setError('Module description is required')
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      await moduleService.createModule({
-        course: courseId,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        order: 1, // Will be auto-incremented by backend if needed
-      })
-
-      onCreated()
-      onClose()
-    } catch (err: any) {
-      console.error('Error creating module:', err)
-      setError(err.response?.data?.error || err.message || 'Failed to create module')
-      setLoading(false)
-    }
+ const create = async () => {
+  // Validate required fields
+  if (!form.title.trim()) {
+    setError('Module title is required')
+    return
   }
+
+  if (!form.description.trim()) {
+    setError('Module description is required')
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await moduleService.createModule({
+      course: courseId,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      order: 1,
+    })
+
+    // Emit custom event for course page to listen to
+    window.dispatchEvent(new CustomEvent('moduleCreated', { 
+      detail: { 
+        courseId,
+        moduleId: res.data?._id 
+      } 
+    }))
+
+    onCreated()
+    onClose()
+  } catch (err: any) {
+    console.error('Error creating module:', err)
+    setError(err.response?.data?.error || err.message || 'Failed to create module')
+    setLoading(false)
+  }
+}
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
