@@ -48,96 +48,91 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null)
   }, [])
 
-  const refreshUser = useCallback(async () => {
-    if (typeof window === 'undefined') return
+const refreshUser = useCallback(async () => {
+  if (typeof window === 'undefined') return
 
-    if (isRefreshingRef.current) {
+  if (isRefreshingRef.current) {
     console.log('⏳ refreshUser already running')
     return
   }
 
   isRefreshingRef.current = true
 
-
-    try {
-      const token = authService.getToken()
-      
-      if (!token) {
-        if (isLoggingInRef.current) {
-          console.log('⏳ Skipping refreshUser during login')
-          return
-        }
-
-        console.log('📭 No auth token found')
-        setUser(null)
-        setLoading(false)
+  try {
+    const token = authService.getToken()
+    
+    if (!token) {
+      if (isLoggingInRef.current) {
+        console.log('⏳ Skipping refreshUser during login')
         return
       }
 
-      console.log('🔄 Refreshing user data...')
-      
-      // Call getMe with better error handling
-      const response = await authService.getMe()
-      
-      console.log('📦 getMe response:', response)
-      
-      // Check if response has the expected structure
-      if (!response) {
-        console.error('❌ No response from getMe')
-        clearAuthStorage()
-        setLoading(false)
-        return
-      }
-
-      // Handle successful response
-      if (response.success && response.data) {
-        // Verify data is not empty
-        if (Object.keys(response.data).length > 0) {
-          console.log('✅ User authenticated:', response.data)
-          setUser(response.data as User)
-        } else {
-          console.log('❌ Empty user data received')
-          clearAuthStorage()
-        }
-      } else {
-        // Handle unsuccessful response
-        console.log('❌ Invalid response structure:', response)
-        
-        // Check if it's an auth error
-        if (response.message?.includes('401') || 
-            response.message?.includes('Unauthorized') || 
-            response.message?.includes('Not authorized')) {
-          console.log('🔒 Authentication error - clearing tokens')
-          clearAuthStorage()
-        }
-      }
-    } catch (err: any) {
-  const status = err?.response?.status
-
-  console.error('❌ Error in refreshUser:', {
-    status,
-    message: err.message
-  })
-
-  // 🚫 DO NOT LOG OUT ON RATE LIMIT
-  if (status === 429) {
-    console.warn('⏳ Rate limited – keeping user logged in')
-    return
-  }
-
-  // ❌ Only logout on real auth errors
-  if (status === 401 || status === 403) {
-    console.log('🔒 Auth error detected - clearing storage')
-    clearAuthStorage()
-  }  
- } finally {
-  isRefreshingRef.current = false
+      console.log('📭 No auth token found')
+      setUser(null)
       setLoading(false)
-      setIsInitialized(true)
+      return
     }
-  }, [clearAuthStorage])
 
+    console.log('🔄 Refreshing user data...')
+    
+    const response = await authService.getMe()
+    
+    console.log('📦 getMe response:', response)
+    
+    if (!response) {
+      console.error('❌ No response from getMe')
+      clearAuthStorage()
+      setLoading(false)
+      return
+    }
 
+    // Type guard: check if response has 'error' property (error response)
+    if ('error' in response && response.error) {
+      console.log('❌ Error response from getMe:', response.message)
+      clearAuthStorage()
+      return
+    }
+
+    // Now TypeScript knows this is a ServiceResponse
+    if (response.success && response.data) {
+      if (Object.keys(response.data).length > 0) {
+        console.log('✅ User authenticated:', response.data)
+        setUser(response.data as User)
+      } else {
+        console.log('❌ Empty user data received')
+        clearAuthStorage()
+      }
+    } else {
+      console.log('❌ Invalid response structure:', response)
+      clearAuthStorage()
+    }
+  } catch (err: any) {
+    const status = err?.response?.status || err?.status
+    const message = err?.response?.data?.message || err?.message || 'Unknown error'
+
+    console.error('❌ Error in refreshUser:', {
+      status,
+      message,
+      type: err?.name
+    })
+
+    // 🚫 DO NOT LOG OUT ON RATE LIMIT
+    if (status === 429) {
+      console.warn('⏳ Rate limited – keeping user logged in')
+      return
+    }
+
+    // ❌ Only logout on real auth errors
+    if (status === 401 || status === 403) {
+      console.log('🔒 Auth error detected - clearing storage')
+      clearAuthStorage()
+    }  
+  } finally {
+    isRefreshingRef.current = false
+    setLoading(false)
+    setIsInitialized(true)
+  }
+}, [clearAuthStorage])
 
 
   useEffect(() => {

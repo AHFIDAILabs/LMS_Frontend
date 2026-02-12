@@ -97,6 +97,33 @@ export interface UserProfileResponse{
 
 
 }
+export interface InstructorStudent {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  profileImage?: string;
+    status: "active" | "completed" | "dropped";
+  enrollmentDate: string;
+  program: string; // The program ID
+ progress: {
+    overallProgress: number;
+    completedLessons: number;
+    totalLessons: number;
+    lastAccessedAt: string;
+  };
+  studentProfile?: {
+    cohort?: string;
+    githubProfile?: string;
+    linkedinProfile?: string;
+  };
+  // This matches your Backend: programCoursesMap[s.program.toString()]
+  courses: Array<{
+    id: string; 
+    title: string;
+    slug: string;
+  }>;
+}
 
 export interface AuthResponse {
   token: string
@@ -605,6 +632,72 @@ export interface Submission {
   submittedAt: string
   gradedAt?: string
   gradedBy?: string
+}
+
+
+export interface StudentProgress {
+  student: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    profileImage?: string;
+    enrollmentDate: string;
+    status: "active" | "completed" | "dropped";
+    studentProfile?: {
+      cohort?: string;
+      githubProfile?: string;
+      linkedinProfile?: string;
+      bio?: string;
+    };
+  };
+  course: {
+    _id: string;
+    title: string;
+    slug: string;
+    description?: string;
+  };
+  progress: {
+    overallProgress: number;
+    completedLessons: number;
+    totalLessons: number;
+    lastAccessedAt: string;
+    timeSpent?: number;
+  };
+  modules?: Array<{
+    _id: string;
+    title: string;
+    order: number;
+    lessons: Array<{
+      _id: string;
+      title: string;
+      order: number;
+      duration?: number;
+      isCompleted: boolean;
+      completedAt?: string;
+      lastAccessedAt?: string;
+    }>;
+  }>;
+  assessments?: Array<{
+    _id: string;
+    title: string;
+    type: string;
+    dueDate?: string;
+    submission?: {
+      _id: string;
+      submittedAt: string;
+      status: "submitted" | "graded" | "late";
+      score?: number;
+      feedback?: string;
+    };
+  }>;
+  stats: {
+    totalTimeSpent: number;
+    averageScore?: number;
+    completionRate: number;
+    lastActiveDate: string;
+    streak?: number;
+  };
 }
 
 // ============= END OF FILE =============

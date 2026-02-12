@@ -77,25 +77,25 @@ export const instructorService = {
   // =========================
   // COURSES
   // =========================
-createCourse: async (
-  data: FormData | Record<string, any>
-): Promise<ApiResponse<any>> => {
-  try {
-    const res = await axiosClient.post(
-      '/instructors/create-courses',
-      data,
-      {
-        headers:
-          data instanceof FormData
-            ? { 'Content-Type': 'multipart/form-data' }
-            : {},
-      }
-    )
-    return res.data
-  } catch (err) {
-    throw new Error(extractError(err))
-  }
-},
+  createCourse: async (
+    data: FormData | Record<string, any>
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.post(
+        '/instructors/courses',
+        data,
+        {
+          headers:
+            data instanceof FormData
+              ? { 'Content-Type': 'multipart/form-data' }
+              : {},
+        }
+      )
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
+  },
 
   getCourses: async (params?: {
     isPublished?: boolean
@@ -137,16 +137,57 @@ createCourse: async (
     }
   },
 
+  // Get detailed progress for a specific student in a course
+   
   getStudentProgress: async (studentId: string, courseId: string) => {
     try {
+      console.log(`Fetching progress for student ${studentId} in course ${courseId}`)
       const res = await axiosClient.get(
         `/instructors/students/${studentId}/courses/${courseId}/progress`
       )
+      console.log('Student progress response:', res.data)
       return res.data
     } catch (err) {
+      console.error('Error fetching student progress:', err)
       throw new Error(extractError(err))
     }
   },
+
+
+  getInstructorModules: async () => {
+  try{
+        const res = await axiosClient.get("/instructors/content/modules");
+        return res.data;
+
+  } catch (err){
+    console.error("Error fetching Instructor Modules", err)
+    throw new Error(extractError(err))
+
+
+  }
+
+},
+
+getInstructorLessons: async () => {
+ try{
+   const res = await axiosClient.get("/instructors/content/lessons");
+  return res.data;
+ } catch (err){
+  console.error("Error fetching Instructor Lessons", err)
+  throw new Error(extractError(err))  
+}},
+
+getInstructorAssessments: async () => {
+    try{
+      const res = await axiosClient.get("/instructors/content/assessments");
+      return res.data;
+    } catch (err){
+      console.error("Error fetching Instructor Assessments", err)
+      throw new Error(extractError(err))
+    }
+},  
+
+
 
   // =========================
   // ASSESSMENTS & SUBMISSIONS

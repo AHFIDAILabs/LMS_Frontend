@@ -17,6 +17,7 @@ import {
   PenLine,
   Bell,
   Video,
+  Layers,
 } from 'lucide-react'
 
 // ──────────────────────────────────────────────
@@ -51,12 +52,12 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       },
       {
         label: 'Content',
-        href: '/dashboard/instructor/content',
+        href: '/dashboard/instructor/contents',
         icon: Video,
         children: [
-          { label: 'Modules', href: '/dashboard/instructor/content/modules', icon: Layers },
-          { label: 'Lessons', href: '/dashboard/instructor/content/lessons', icon: FileText },
-          { label: 'Assessments', href: '/dashboard/instructor/content/assessments', icon: PenLine },
+          { label: 'Modules', href: '/dashboard/instructor/contents/modules', icon: Layers },
+          { label: 'Lessons', href: '/dashboard/instructor/contents/lessons', icon: FileText },
+          { label: 'Assessments', href: '/dashboard/instructor/contents/assessments', icon: PenLine },
         ],
       },
       { label: 'My Students', href: '/dashboard/instructor/students', icon: Users },
@@ -76,9 +77,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     ],
   },
 ]
-
-// Placeholder — imported only so the file compiles; remove if Layers is unused
-import { Layers } from 'lucide-react'
 
 // ──────────────────────────────────────────────
 // Sub-components

@@ -27,6 +27,7 @@ import {
   FolderKanban,
 } from 'lucide-react'
 import Link from 'next/link'
+import { adminService } from '@/services/adminService'
 
 const LEVEL_COLORS: Record<string, string> = {
   beginner: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -70,7 +71,7 @@ export default function AdminCourseDetailPage() {
       setError(null)
       
       // Fetch course basic info
-      const courseResponse = await courseService.getCourseById(courseId)
+      const courseResponse = await adminService.getCourseById(courseId)
       
       if (courseResponse.success && courseResponse.data) {
         const courseData = courseResponse.data as Course

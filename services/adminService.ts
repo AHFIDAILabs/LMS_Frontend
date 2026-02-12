@@ -1,6 +1,7 @@
 
 // services/adminService.ts
-import { fetchWithAuth, handleResponse } from '../lib/utils'; // assuming you move your helper functions to a utils file
+import { axiosClient } from '@/lib/axiosClient';
+import { fetchWithAuth, handleResponse, extractError } from '../lib/utils'; // assuming you move your helper functions to a utils file
 import {GetAllUsersResponse} from '@/types';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'
 
@@ -40,6 +41,26 @@ export const adminService = {
     return handleResponse(response);
   },
 
+    // Admin-specific endpoint
+  getCourseById: async (courseId: string) => {
+    try {
+      // ✅ Use admin endpoint that populates everything
+      const res = await axiosClient.get(`/admin/courses/${courseId}`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
+  },
+
+  // Public endpoint (keep for student view)
+  getCourseByIdPublic: async (courseId: string) => {
+    try {
+      const res = await axiosClient.get(`/courses/${courseId}`)
+      return res.data
+    } catch (err) {
+      throw new Error(extractError(err))
+    }
+  },
   updateUserStatus: async (userId: string, status: string) => {
     const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/status`, {
       method: 'PATCH',
@@ -103,13 +124,18 @@ promoteToInstructor: async (userId: string, programId?: string) => {
   // =============================
   // BULK OPERATIONS
   // =============================
-  bulkEnrollStudents: async (data: any) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/bulk/enroll`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
-  },
+  bulkEnrollStudents: async (studentIds: string[], programId: string, cohort?: string) => {
+  const response = await fetch('/api/admin/bulk/enroll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      studentIds, 
+      programId,  // Changed from courseId
+      cohort 
+    })
+  });
+  return response.json();
+},
 
   bulkUpdateStatus: async (data: any) => {
     const response = await fetchWithAuth(`${API_URL}/admin/bulk/status`, {
@@ -132,3 +158,5 @@ promoteToInstructor: async (userId: string, programId?: string) => {
     return handleResponse(response);
   },
 };
+
+

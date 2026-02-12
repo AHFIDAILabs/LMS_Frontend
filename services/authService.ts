@@ -18,6 +18,7 @@ interface ServiceResponse {
   refreshToken?: string
   data?: any
   message?: string
+  error?: boolean  // Add this optional property
 }
 
 // =============================
@@ -154,15 +155,24 @@ async getMe() {
 
       console.log('- Response status:', response.status)
       return response.data;
-    } catch (error: any) {
-      console.error('❌ getMe Error Details:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-      })
-      throw error
-    }
-  },
+   // In authService.ts getMe method
+} catch (error: any) {
+  console.error('❌ getMe Error Details:', {
+    message: error?.message || 'Unknown error',
+    status: error?.response?.status,
+    statusText: error?.response?.statusText,
+    data: error?.response?.data,
+    name: error?.name,
+  })
+  
+  // Return a ServiceResponse with error flag
+  return {
+    success: false,
+    message: error?.response?.data?.message || error?.message || 'Failed to get user',
+    error: true,
+    data: undefined  // Explicitly set data to undefined
+  } as ServiceResponse
+}},
 
   getProfile: async () => {
     try {
