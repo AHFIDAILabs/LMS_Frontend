@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/lib/context/AuthContext'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
 interface AuthLoadingProps {
@@ -11,18 +11,17 @@ interface AuthLoadingProps {
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
   '/',
-  '/login',
   '/auth/login',
-  '/register',
   '/auth/register',
+  '/register',
   '/forgot-password',
   '/reset-password',
   '/verify-email',
   '/about',
   '/contact',
-  '/programs',        // ✅ Changed from '/program' to '/programs'
-  '/allPrograms',     // ✅ Added - your all programs page
-  '/courses',         // ✅ Added - course listing pages
+  '/programs',
+  '/allPrograms',
+  '/courses',
   '/curriculum',
   '/modules',
   '/privacy',
@@ -32,40 +31,93 @@ const PUBLIC_ROUTES = [
 
 // Routes that should redirect to dashboard if already authenticated
 const AUTH_ROUTES = [
-  '/login',
   '/auth/login',
   '/register',
   '/auth/register',
 ]
 
+// Helper function to check if route is public (including dynamic routes)
+const isRoutePublic = (pathname: string | null): boolean => {
+  if (!pathname) return false
+  
+  return PUBLIC_ROUTES.some(route => {
+    // Exact match
+    if (pathname === route) return true
+    
+    // Allow sub-routes (e.g., /programs/some-slug)
+    if (pathname.startsWith(route + '/')) return true
+    
+    return false
+  })
+}
+
+// Helper function to check if route is an auth route
+const isRouteAuth = (pathname: string | null): boolean => {
+  if (!pathname) return false
+  return AUTH_ROUTES.includes(pathname)
+}
+
 export function AuthLoadingWrapper({ children }: AuthLoadingProps) {
-  const { loading, isAuthenticated } = useAuth()
+  const { loading, isAuthenticated, user } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
+  const hasRedirectedRef = useRef(false)
+  const lastPathnameRef = useRef<string | null>(null)
 
-const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route))
-  const isAuthRoute = AUTH_ROUTES.some(route => pathname === route)
+  const isPublicRoute = isRoutePublic(pathname)
+  const isAuthRoute = isRouteAuth(pathname)
 
   useEffect(() => {
-
-    
-   if (loading && !isPublicRoute) {
-      // If user is authenticated and trying to access auth pages, redirect to dashboard
-      if (isAuthenticated && isAuthRoute) {
-        console.log('Redirecting authenticated user from auth route to dashboard/students')
-        router.push('/dashboard/students')
-      }
-      
-      // If user is not authenticated and trying to access protected route, redirect to login
-      if (!isAuthenticated && !isPublicRoute) {
-        console.log('Redirecting unauthenticated user to login')
-        router.push('/login')
-      }
+    // Reset redirect flag when pathname changes
+    if (pathname !== lastPathnameRef.current) {
+      hasRedirectedRef.current = false
+      lastPathnameRef.current = pathname
     }
-  }, [loading, isAuthenticated, isAuthRoute, isPublicRoute, pathname, router])
+
+    // Skip if still loading auth state
+    if (loading) {
+      console.log('⏳ Auth still loading, skipping redirect logic')
+      return
+    }
+
+    // Skip if already redirected for this pathname
+    if (hasRedirectedRef.current) {
+      console.log('✅ Already redirected for this path, skipping')
+      return
+    }
+
+    // CASE 1: Authenticated user on auth pages (login/register)
+    if (isAuthenticated && isAuthRoute) {
+      console.log('🔄 Redirecting authenticated user from auth page to dashboard')
+      hasRedirectedRef.current = true
+      
+      // Get user-specific dashboard
+      const dashboardRoute = user?.role === 'student' 
+        ? '/dashboard/students'
+        : user?.role === 'instructor'
+        ? '/dashboard/instructor'
+        : user?.role === 'admin'
+        ? '/dashboard/admin'
+        : '/dashboard/students' // default
+      
+      router.push(dashboardRoute)
+      return
+    }
+
+    // CASE 2: Unauthenticated user on protected route
+    if (!isAuthenticated && !isPublicRoute) {
+      console.log('🔒 Redirecting unauthenticated user to login')
+      hasRedirectedRef.current = true
+      router.push('/auth/login')
+      return
+    }
+
+    console.log('✅ No redirect needed')
+  }, [loading, isAuthenticated, isAuthRoute, isPublicRoute, pathname, router, user])
 
   // Show loading spinner while checking authentication
-  if (loading) {
+  // BUT only for protected routes to avoid flash on public pages
+  if (loading && !isPublicRoute) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">

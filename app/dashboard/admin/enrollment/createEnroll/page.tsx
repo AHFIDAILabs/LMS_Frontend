@@ -418,7 +418,7 @@ const downloadCSVTemplate = () => {
         {/* Header */}
         <div className="mb-6">
           <Link
-            href="/dashboard/admin/enrollments"
+            href="/dashboard/admin/enrollment"
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft size={20} />

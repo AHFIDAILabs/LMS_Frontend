@@ -18,7 +18,7 @@ export default function AddLessonModal({ moduleId, onClose, onCreated }: AddLess
     type: 'video',
     estimatedMinutes: 30,
     content: '',
-    order: 1,
+    order: '',
     learningObjectives: [''],
     codeExamples: [''],
     assignments: [''],

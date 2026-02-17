@@ -233,8 +233,7 @@ export default function CurriculumPage() {
         <AddModuleModal
           courseId={courseId}
           onClose={() => setShowAddModal(false)}
-          onCreated={fetchData}
-        />
+          onCreated={fetchData} courseName={''}        />
       )}
 
       {editingModule && (

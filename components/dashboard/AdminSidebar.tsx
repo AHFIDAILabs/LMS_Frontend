@@ -3,82 +3,64 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/context/AuthContext'
-import Image from "next/image"
+import Image from 'next/image'
 import clsx from 'clsx'
+import { useState } from 'react'
+import { useNotificationCount } from '@/hooks/useNotificationCount'
 import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  CheckCircle2,
-  BarChart3,
-  Award,
-  Settings,
-  LogOut,
-  ChevronDown,
-  Layers,
-  FileText,
-  Bell,
-  Gift, // For scholarships
+  LayoutDashboard, Users, BookOpen, CheckCircle2,
+  BarChart3, Award, Settings, LogOut, ChevronDown,
+  Layers, FileText, Bell, Gift,
 } from 'lucide-react'
 
-// ──────────────────────────────────────────────
-// Nav structure
-// ──────────────────────────────────────────────
 interface NavItem {
   label: string
   href: string
   icon: React.ComponentType<{ className?: string }>
-  children?: NavItem[]  // nested routes collapse under the parent
+  children?: NavItem[]
+  isNotification?: boolean
 }
 
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overview',
     items: [
-      { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-      { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell },
+      { label: 'Dashboard',     href: '/dashboard/admin',               icon: LayoutDashboard },
+      { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, isNotification: true },
     ],
   },
   {
     label: 'Management',
     items: [
       {
-        label: 'Users',
-        href: '/dashboard/admin/users',
-        icon: Users,
+        label: 'Users', href: '/dashboard/admin/users', icon: Users,
         children: [
-          { label: 'All Users', href: '/dashboard/admin/users', icon: Users },
-          { label: 'Students', href: '/dashboard/admin/users/students', icon: Users },
-          { label: 'Instructors', href: '/dashboard/admin/users/instructors', icon: Users },
+          { label: 'All Users',    href: '/dashboard/admin/users',            icon: Users },
+          { label: 'Students',     href: '/dashboard/admin/users/students',   icon: Users },
+          { label: 'Instructors',  href: '/dashboard/admin/users/instructors',icon: Users },
         ],
       },
       {
-        label: 'Programs',
-        href: '/dashboard/admin/programes',
-        icon: Layers,
+        label: 'Programs', href: '/dashboard/admin/programes', icon: Layers,
         children: [
-          { label: 'All Programs', href: '/dashboard/admin/programes', icon: Layers },
-          { label: 'Course', href: '/dashboard/admin/programes/course', icon: Layers },
+          { label: 'All Programs', href: '/dashboard/admin/programes',        icon: Layers },
+          { label: 'Course',       href: '/dashboard/admin/programes/course', icon: Layers },
         ],
       },
       {
-        label: 'Courses',
-        href: '/dashboard/admin/courses',
-        icon: BookOpen,
+        label: 'Courses', href: '/dashboard/admin/courses', icon: BookOpen,
         children: [
-          { label: 'All Courses', href: '/dashboard/admin/courses', icon: BookOpen },
-          { label: 'Programs', href: '/dashboard/admin/programes', icon: Layers },
+          { label: 'All Courses', href: '/dashboard/admin/courses',   icon: BookOpen },
+          { label: 'Programs',    href: '/dashboard/admin/programes', icon: Layers },
         ],
       },
-      { label: 'Approvals', href: '/dashboard/admin/approvals', icon: CheckCircle2 },
-      { label: 'Enrollments', href: '/dashboard/admin/enrollment', icon: FileText },
+      { label: 'Approvals',   href: '/dashboard/admin/approvals',   icon: CheckCircle2 },
+      { label: 'Enrollments', href: '/dashboard/admin/enrollment',  icon: FileText },
       {
-        label: 'Scholarships',
-        href: '/dashboard/admin/scholarship',
-        icon: Gift,
+        label: 'Scholarships', href: '/dashboard/admin/scholarship', icon: Gift,
         children: [
-          { label: 'All Scholarships', href: '/dashboard/admin/scholarship', icon: Gift },
-          { label: 'Statistics', href: '/dashboard/admin/scholarship/stats', icon: BarChart3 },
+          { label: 'All Scholarships', href: '/dashboard/admin/scholarship',       icon: Gift },
+          { label: 'Statistics',       href: '/dashboard/admin/scholarship/stats', icon: BarChart3 },
         ],
       },
     ],
@@ -86,7 +68,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Reports',
     items: [
-      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3 },
+      { label: 'Analytics',    href: '/dashboard/admin/analytics',    icon: BarChart3 },
       { label: 'Certificates', href: '/dashboard/admin/certificates', icon: Award },
     ],
   },
@@ -98,28 +80,14 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   },
 ]
 
-// ──────────────────────────────────────────────
-// Sub-components
-// ──────────────────────────────────────────────
-function NavLink({
-  item,
-  level = 0,
-}: {
-  item: NavItem
-  level?: number
+function NavLink({ item, level = 0, unreadCount = 0 }: {
+  item: NavItem; level?: number; unreadCount?: number
 }) {
   const pathname = usePathname()
   const hasChildren = item.children && item.children.length > 0
-
-  // Parent is "active" if the current path starts with its href
   const parentActive = hasChildren && pathname.startsWith(item.href)
-  // Exact match for leaf items
-  const exactActive = !hasChildren && pathname === item.href
-
+  const exactActive  = !hasChildren && pathname === item.href
   const active = parentActive || exactActive
-
-  // If this item has children and the parent route is active, show them
-  const expanded = parentActive
 
   return (
     <>
@@ -128,29 +96,28 @@ function NavLink({
         className={clsx(
           'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
           level > 0 && 'ml-4 pl-3 py-2 text-xs',
-          active
-            ? 'bg-lime-500/10 text-lime-400'
-            : 'text-gray-400 hover:bg-slate-800 hover:text-white'
+          active ? 'bg-purple-500/10 text-purple-400' : 'text-gray-400 hover:bg-slate-800 hover:text-white'
         )}
       >
         <item.icon className={clsx('shrink-0', level > 0 ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')} />
         <span className="flex-1">{item.label}</span>
 
+        {/* ✅ Unread count badge */}
+        {item.isNotification && unreadCount > 0 && (
+          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+
         {hasChildren && (
-          <ChevronDown
-            className={clsx(
-              'w-3.5 h-3.5 transition-transform',
-              expanded ? 'rotate-180' : ''
-            )}
-          />
+          <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', parentActive ? 'rotate-180' : '')} />
         )}
       </Link>
 
-      {/* Nested children */}
-      {hasChildren && expanded && (
+      {hasChildren && parentActive && (
         <div className="mt-0.5">
           {item.children!.map((child) => (
-            <NavLink key={child.href} item={child} level={1} />
+            <NavLink key={child.href} item={child} level={1} unreadCount={unreadCount} />
           ))}
         </div>
       )}
@@ -158,33 +125,32 @@ function NavLink({
   )
 }
 
-// ──────────────────────────────────────────────
-// Main sidebar
-// ──────────────────────────────────────────────
 export default function AdminSidebar() {
   const { user, logout } = useAuth()
+  const [imageError, setImageError] = useState(false)
+  const { unreadCount } = useNotificationCount()  // ✅ live count
 
-  const handleLogout = async () => {
-    try {
-      await logout()
-    } catch (err) {
-      console.error('Logout failed:', err)
-    }
+  const handleLogout = async () => { try { await logout() } catch {} }
+  const userInitials = `${(user?.firstName?.[0] || '').toUpperCase()}${(user?.lastName?.[0] || '').toUpperCase()}`
+
+  const getValidImageUrl = (url?: string) => {
+    if (!url || url.trim() === '') return null
+    if (url.startsWith('http://') || url.startsWith('https://')) return url
+    return url.startsWith('/') ? url : `/${url}`
   }
+  const validImageUrl   = getValidImageUrl(user?.profileImage)
+  const shouldShowImage = validImageUrl && !imageError
 
   return (
     <aside className="fixed inset-y-0 left-0 w-64 py-2.5 bg-slate-950 border-r border-gray-800 flex flex-col">
       {/* Logo */}
       <Link href="/" className="h-16 flex items-center px-6 border-b border-gray-800">
-        <div className="w-9 h-9 rounded-lg bg-linear-to-br from-lime-500 to-emerald-500 flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-lime-500 to-emerald-500 flex items-center justify-center shrink-0">
           <span className="font-bold text-slate-900">A</span>
         </div>
-        <span className="ml-3 text-white font-semibold text-lg truncate">
-          AI4SID~Academy
-        </span>
+        <span className="ml-3 text-white font-semibold text-lg truncate">AI4SID~Academy</span>
       </Link>
 
-      {/* Role badge */}
       <div className="px-4 pt-4 pb-2">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 text-xs font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
@@ -192,55 +158,35 @@ export default function AdminSidebar() {
         </span>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4">
         {navGroups.map((group) => (
           <div key={group.label}>
-            {/* Group label */}
-            <p className="px-4 mb-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              {group.label}
-            </p>
-
-            {/* Items */}
+            <p className="px-4 mb-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map((item) => (
-                <NavLink key={item.href} item={item} />
+                <NavLink key={item.href} item={item} unreadCount={unreadCount} />
               ))}
             </div>
           </div>
         ))}
       </nav>
 
-      {/* Footer — user info + logout */}
       <div className="border-t border-gray-800">
-        {/* User strip */}
         <div className="flex items-center gap-3 p-4">
-          <div className="relative w-9 h-9 shrink-0">
-  <Image
-    src={
-      user?.profileImage ||
-      "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
-    }
-    alt={user?.firstName || "Admin"}
-    fill
-    className="rounded-full object-cover border border-gray-700"
-  />
-</div>
-
+          <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-300 shrink-0 overflow-hidden">
+            {shouldShowImage ? (
+              <Image src={validImageUrl!} alt="" width={36} height={36} className="w-full h-full object-cover" onError={() => setImageError(true)} unoptimized />
+            ) : (
+              <span>{userInitials || 'A'}</span>
+            )}
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
-              {user?.firstName} {user?.lastName}
-            </p>
+            <p className="text-sm font-medium text-white truncate">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
         </div>
-
-        {/* Logout */}
         <div className="px-3 pb-3">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-slate-800 hover:text-red-400 transition-all"
-          >
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-slate-800 hover:text-red-400 transition-all">
             <LogOut className="w-4.5 h-4.5" />
             Logout
           </button>

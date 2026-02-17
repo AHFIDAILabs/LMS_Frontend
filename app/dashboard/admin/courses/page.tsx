@@ -1,14 +1,28 @@
+// app/dashboard/admin/courses/page.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useEnrollment } from '@/lib/context/EnrollmentContext'
 import { courseService } from '@/services/courseService'
 import { Course } from '@/types'
-import { Book, Eye, Edit, Trash2, CheckCircle, XCircle, Globe, Lock, Plus } from 'lucide-react'
+import { 
+  Book, 
+  Eye, 
+  Edit, 
+  Trash2, 
+  CheckCircle, 
+  XCircle, 
+  Globe, 
+  Lock, 
+  Plus,
+  Users,
+  TrendingUp,
+  Clock,
+  AlertCircle
+} from 'lucide-react'
 import Link from 'next/link'
-
-
 
 // Badge styles
 const LEVEL_STYLES: Record<string, string> = {
@@ -26,6 +40,8 @@ const STATUS_STYLES = {
 
 export default function AdminCoursesPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const { refreshEnrollments, enrollmentStats } = useEnrollment()
+  
   const [courses, setCourses] = useState<Course[]>([])
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft'>('all')
@@ -83,6 +99,22 @@ export default function AdminCoursesPage() {
     )
   }, [courses, search])
 
+  // ✅ Calculate total enrollments from stats (more accurate)
+  const totalEnrollments = useMemo(() => {
+    return Object.values(enrollmentStats).reduce((sum, stats) => sum + (stats?.total || 0), 0)
+  }, [enrollmentStats])
+
+  // ✅ Get course enrollment count (prefer stats over currentEnrollment)
+  const getCourseEnrollmentCount = useCallback((courseId: string, fallback: number = 0) => {
+    const stats = enrollmentStats[courseId]
+    return stats?.total ?? fallback
+  }, [enrollmentStats])
+
+  // ✅ Get course-specific enrollment stats
+  const getCourseStats = useCallback((courseId: string) => {
+    return enrollmentStats[courseId] || null
+  }, [enrollmentStats])
+
   // Toggle publish status
   const handleTogglePublish = async (courseId: string) => {
     try {
@@ -114,7 +146,7 @@ export default function AdminCoursesPage() {
       if (response.success) {
         setCourses(prev =>
           prev.map(c =>
-            c._id === courseId ? { ...c, isApproved: true } : c
+            c._id === courseId ? { ...c, isApproved: true, approvalStatus: 'approved' } : c
           )
         )
       } else {
@@ -136,7 +168,7 @@ export default function AdminCoursesPage() {
       if (response.success) {
         setCourses(prev =>
           prev.map(c =>
-            c._id === courseId ? { ...c, isApproved: false } : c
+            c._id === courseId ? { ...c, isApproved: false, approvalStatus: 'rejected' } : c
           )
         )
       } else {
@@ -161,6 +193,9 @@ export default function AdminCoursesPage() {
       
       if (response.success) {
         setCourses(prev => prev.filter(c => c._id !== courseId))
+        
+        // ✅ Refresh enrollments after deleting a course
+        await refreshEnrollments()
       } else {
         setError(response.error || 'Failed to delete course')
       }
@@ -233,36 +268,66 @@ export default function AdminCoursesPage() {
           </select>
         </div>
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Enhanced Stats Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 rounded-xl p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Total Courses</p>
-            <p className="text-2xl font-bold text-white mt-1">{courses.length}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-lime-500/20 flex items-center justify-center">
+                <Book className="text-lime-400" size={20} />
+              </div>
+              <p className="text-gray-400 text-sm">Total Courses</p>
+            </div>
+            <p className="text-2xl font-bold text-white">{courses.length}</p>
           </div>
+
           <div className="bg-slate-800/50 rounded-xl p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Published</p>
-            <p className="text-2xl font-bold text-lime-400 mt-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <Globe className="text-emerald-400" size={20} />
+              </div>
+              <p className="text-gray-400 text-sm">Published</p>
+            </div>
+            <p className="text-2xl font-bold text-lime-400">
               {courses.filter(c => c.isPublished).length}
             </p>
           </div>
+
           <div className="bg-slate-800/50 rounded-xl p-4 border border-gray-700">
-            <p className="text-gray-400 text-sm">Draft</p>
-            <p className="text-2xl font-bold text-gray-400 mt-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-gray-500/20 flex items-center justify-center">
+                <Lock className="text-gray-400" size={20} />
+              </div>
+              <p className="text-gray-400 text-sm">Draft</p>
+            </div>
+            <p className="text-2xl font-bold text-gray-400">
               {courses.filter(c => !c.isPublished).length}
             </p>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-gray-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Users className="text-blue-400" size={20} />
+              </div>
+              <p className="text-gray-400 text-sm">Total Enrollments</p>
+            </div>
+            <p className="text-2xl font-bold text-blue-400">{totalEnrollments}</p>
           </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4">
-            <p className="text-red-400">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-300 text-sm underline mt-2"
-            >
-              Dismiss
-            </button>
+          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={20} />
+            <div className="flex-1">
+              <p className="text-red-400">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-300 text-sm underline mt-2"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
@@ -275,6 +340,9 @@ export default function AdminCoursesPage() {
           <div className="grid grid-cols-1 gap-4">
             {filteredCourses.map(course => {
               const isActionLoading = actionLoading === course._id
+              const courseStats = getCourseStats(course._id)
+              // ✅ Use stats as primary source, fallback to course.currentEnrollment
+              const enrollmentCount = getCourseEnrollmentCount(course._id, course.currentEnrollment || 0)
               
               return (
                 <div
@@ -284,8 +352,8 @@ export default function AdminCoursesPage() {
                   }`}
                 >
                   <div className="flex flex-col lg:flex-row gap-6">
-                    {/* coverImage */}
-                    <div className="w-full lg:w-48 h-32 bg-linear-to-br from-slate-700 to-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {/* Cover Image */}
+                    <div className="w-full lg:w-48 h-32 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {course.coverImage ? (
                         <img
                           src={course.coverImage.startsWith('http') ? course.coverImage : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${course.coverImage}`}
@@ -329,18 +397,18 @@ export default function AdminCoursesPage() {
                             )}
                           </span>
                           
-                      {course.level && (() => {
-  const level = Array.isArray(course.level) ? course.level[0] : course.level;
-  const levelKey = level?.toLowerCase() || 'beginner';
-  
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-      LEVEL_STYLES[levelKey] || LEVEL_STYLES.beginner
-    }`}>
-      {level}
-    </span>
-  );
-})()}
+                          {course.level && (() => {
+                            const level = Array.isArray(course.level) ? course.level[0] : course.level;
+                            const levelKey = level?.toLowerCase() || 'beginner';
+                            
+                            return (
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                                LEVEL_STYLES[levelKey] || LEVEL_STYLES.beginner
+                              }`}>
+                                {level}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -349,7 +417,7 @@ export default function AdminCoursesPage() {
                         {course.instructor && (
                           <span className="flex items-center gap-1">
                             <span className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs">
-                              {course.instructor?.firstName}{course.instructor?.lastName}
+                              {course.instructor?.firstName?.[0]}{course.instructor?.lastName?.[0]}
                             </span>
                             {course.instructor?.firstName} {course.instructor?.lastName}
                           </span>
@@ -367,9 +435,25 @@ export default function AdminCoursesPage() {
                           </span>
                         )}
                         
-                        {course.currentEnrollment !== undefined && (
-                          <span>
-                            {course.currentEnrollment} enrolled
+                        {/* ✅ Fixed: Show stats-based enrollment count */}
+                        <span className="flex items-center gap-1.5">
+                          <Users size={14} />
+                          <span className="font-medium text-white">
+                            {enrollmentCount}
+                          </span>
+                          <span>enrolled</span>
+                          {courseStats && courseStats.active > 0 && (
+                            <span className="text-emerald-400">
+                              ({courseStats.active} active)
+                            </span>
+                          )}
+                        </span>
+
+                        {/* Show completion rate if available */}
+                        {courseStats && courseStats.completionRate > 0 && (
+                          <span className="flex items-center gap-1.5 text-emerald-400">
+                            <TrendingUp size={14} />
+                            {courseStats.completionRate}% completion
                           </span>
                         )}
                       </div>
@@ -385,7 +469,7 @@ export default function AdminCoursesPage() {
                         </Link>
                         
                         <Link
-                          href={`/admin/courses/${course._id}/edit`}
+                          href={`/dashboard/admin/courses/${course._id}/edit`}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-colors"
                         >
                           <Edit size={16} />

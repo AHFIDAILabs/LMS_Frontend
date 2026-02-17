@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useAuth } from '@/lib/context/AuthContext'
-import { instructorService } from '@/services/instructorService'
+import { useInstructor } from '@/hooks/useInstructor' // ✅ Import the hook
 import InstructorSidebar from '@/components/dashboard/InstructorSide'
+import Link from 'next/link'
 import {
   BookOpen,
   Users,
@@ -15,29 +14,10 @@ import {
   CheckCircle,
   AlertCircle,
   Video,
-  BarChart3,
   Bell,
   Calendar,
   MessageSquare,
 } from 'lucide-react'
-
-interface DashboardStats {
-  courses: {
-    total: number
-    published: number
-  }
-  students: {
-    totalEnrollments: number
-    active: number
-  }
-  assessments: {
-    pendingSubmissions: number
-    gradedThisWeek: number
-  }
-  recentActivity: {
-    submissions: any[]
-  }
-}
 
 const StatCard = ({
   title,
@@ -133,27 +113,12 @@ const RecentSubmissionCard = ({ submission }: { submission: any }) => {
 
 export default function InstructorDashboard() {
   const { user } = useAuth()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  
+  // ✅ Use the hook instead of local state
+  const { stats, statsLoading, error, refreshStats } = useInstructor()
 
-  useEffect(() => {
-    fetchDashboardStats()
-  }, [])
-
-  const fetchDashboardStats = async () => {
-    setLoading(true)
-    try {
-      const response = await instructorService.getDashboardStats()
-      if (response.success) {
-        setStats(response.data)
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // ✅ Use stats from hook
+  const loading = statsLoading
 
   if (loading) {
     return (
@@ -181,7 +146,7 @@ export default function InstructorDashboard() {
             </p>
             <p className="text-gray-500 mb-4">{error}</p>
             <button
-              onClick={fetchDashboardStats}
+              onClick={refreshStats}
               className="px-4 py-2 bg-emerald-400 hover:bg-emerald-500 text-slate-900 rounded-lg text-sm font-semibold transition-colors"
             >
               Retry
@@ -240,7 +205,7 @@ export default function InstructorDashboard() {
         {/* Main Content */}
         <main className="container-custom py-8 space-y-8">
           {/* Welcome Banner */}
-          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-linear-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
+          <section className="relative overflow-hidden rounded-2xl border border-gray-800 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 blur-[140px]" />
             </div>
@@ -351,7 +316,7 @@ export default function InstructorDashboard() {
                     </p>
                   </div>
                   <Link
-                    href="/dashboard/instructor/submissions"
+                    href="/dashboard/instructor/submission"
                     className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
                     View All →
@@ -403,7 +368,7 @@ export default function InstructorDashboard() {
                   </Link>
 
                   <Link
-                    href="/dashboard/instructor/submissions/pending"
+                    href="/dashboard/instructor/submission"
                     className="flex items-center gap-3 p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-gray-700/50 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-orange-400/10 flex items-center justify-center group-hover:bg-orange-400/20 transition-colors">
@@ -420,7 +385,7 @@ export default function InstructorDashboard() {
                   </Link>
 
                   <Link
-                    href="/dashboard/instructor/content/modules"
+                    href="/dashboard/instructor/contents/modules"
                     className="flex items-center gap-3 p-4 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-gray-700/50 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-blue-400/10 flex items-center justify-center group-hover:bg-blue-400/20 transition-colors">

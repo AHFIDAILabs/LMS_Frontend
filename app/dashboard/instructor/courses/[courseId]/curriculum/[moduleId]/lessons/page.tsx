@@ -42,48 +42,55 @@ export default function ManageLessonsPage() {
   const [editingLesson, setEditingLesson] = useState<any>(null)
 
   // Fetch module and lessons
-  const fetchData = async () => {
+
+const fetchData = async () => {
     try {
-      console.log('🔄 Fetching data for moduleId:', moduleId)
-      setLoading(true)
-      setError(null)
+      console.log('[ManageLessons] fetching moduleId:', moduleId);
+      setLoading(true);
+      setError(null);
 
       const [moduleRes, lessonsRes] = await Promise.all([
         moduleService.getModule(moduleId),
-        lessonService.getLessonsByModule(moduleId, true), // Include unpublished
-      ])
+        lessonService.getLessonsByModule(moduleId, true),
+      ]);
 
-      console.log('📦 Module Response:', moduleRes)
-      console.log('📦 Lessons Response:', lessonsRes)
+      console.log('[ManageLessons] moduleRes:', moduleRes);
+      console.log('[ManageLessons] lessonsRes:', lessonsRes);
 
-      if (moduleRes.success && lessonsRes.success) {
-        const moduleData = moduleRes.data.module || moduleRes.data
-        const lessonsData = lessonsRes.data
-        
-        console.log('✅ Module Data:', moduleData)
-        console.log('✅ Lessons Data:', lessonsData)
-        console.log('✅ Lessons Count:', lessonsData?.length || 0)
-        
-        setModule(moduleData)
-        setLessons(Array.isArray(lessonsData) ? lessonsData : [])
+      if (moduleRes?.success && lessonsRes?.success) {
+        const moduleData = moduleRes.data.module || moduleRes.data;
+        const lessonsData = Array.isArray(lessonsRes.data) ? lessonsRes.data : [];
+
+        // 🔒 sanity check: make sure BE gives the module we asked for
+        if (moduleData?._id && String(moduleData._id) !== String(moduleId)) {
+          console.warn('[ManageLessons] Received a different module than requested', {
+            requested: moduleId,
+            received: moduleData?._id,
+          });
+        }
+
+        setModule(moduleData);
+        setLessons(lessonsData);
       } else {
-        console.error('❌ Failed response:', { moduleRes, lessonsRes })
-        setError('Failed to load lessons')
+        setError('Failed to load lessons');
       }
     } catch (err: any) {
-      console.error('❌ Error fetching data:', err)
-      console.error('Error details:', err.response?.data)
-      setError(err.message || 'Failed to load lessons')
+      console.error('❌ Error fetching data:', err);
+      setError(err.message || 'Failed to load lessons');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // 🔄 Reset state on moduleId change to avoid showing stale (Module 1) data
   useEffect(() => {
-    if (moduleId) {
-      fetchData()
-    }
-  }, [moduleId])
+    if (!moduleId) return;
+    setModule(null);
+    setLessons([]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleId]);
+
 
   // Toggle lesson publish status
   const handleTogglePublish = async (lessonId: string) => {

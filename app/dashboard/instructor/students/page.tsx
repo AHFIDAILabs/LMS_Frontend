@@ -87,11 +87,15 @@ export default function InstructorStudentsPage() {
       console.log('Students response:', response);
 
       if (response.success && response.data) {
-        setStudents(response.data);
+        // Remove duplicates based on _id
+        const uniqueStudents = removeDuplicates(response.data);
+        console.log(`Original: ${response.data.length}, Unique: ${uniqueStudents.length}`);
+        
+        setStudents(uniqueStudents);
         setTotalPages(response.pages || 1);
-        setTotalStudents(response.total || response.count || 0);
+        setTotalStudents(response.total || response.count || uniqueStudents.length);
 
-        calculateStats(response.data);
+        calculateStats(uniqueStudents);
       } else {
         setError(response.error || "Failed to fetch students");
       }
@@ -101,6 +105,19 @@ export default function InstructorStudentsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Remove duplicate students based on _id
+  const removeDuplicates = (studentData: InstructorStudent[]) => {
+    const seen = new Set<string>();
+    return studentData.filter((student) => {
+      if (seen.has(student._id)) {
+        console.warn(`Duplicate student found: ${student._id} - ${student.firstName} ${student.lastName}`);
+        return false;
+      }
+      seen.add(student._id);
+      return true;
+    });
   };
 
   const calculateStats = (studentData: InstructorStudent[]) => {
@@ -401,9 +418,9 @@ export default function InstructorStudentsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   {filteredStudents.length > 0 ? (
-                    filteredStudents.map((student) => (
+                    filteredStudents.map((student, index) => (
                       <tr
-                        key={student._id}
+                        key={`${student._id}-${index}`}
                         className="hover:bg-slate-700/30 transition-colors"
                       >
                         <td className="px-4 py-3">
@@ -431,7 +448,7 @@ export default function InstructorStudentsPage() {
                               {student.courses && student.courses.length > 0 ? (
                                 <div className="space-y-1">
                                   {student.courses.slice(0, 2).map((course, idx) => (
-                                    <p key={course.id} className="text-gray-300 text-xs truncate">
+                                    <p key={`${course.id}-${idx}`} className="text-gray-300 text-xs truncate">
                                       {course.title}
                                     </p>
                                   ))}
@@ -537,8 +554,8 @@ export default function InstructorStudentsPage() {
             {/* Mobile Cards */}
             <div className="lg:hidden divide-y divide-gray-700">
               {filteredStudents.length > 0 ? (
-                filteredStudents.map((student) => (
-                  <div key={student._id} className="p-4 hover:bg-slate-700/30 transition-colors">
+                filteredStudents.map((student, index) => (
+                  <div key={`${student._id}-mobile-${index}`} className="p-4 hover:bg-slate-700/30 transition-colors">
                     {/* Student Info */}
                     <div className="flex items-start gap-3 mb-3">
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-semibold shrink-0">
@@ -574,8 +591,8 @@ export default function InstructorStudentsPage() {
                       </div>
                       {student.courses && student.courses.length > 0 ? (
                         <div className="space-y-1 ml-5">
-                          {student.courses.map((course) => (
-                            <p key={course.id} className="text-gray-300 text-xs truncate">
+                          {student.courses.map((course, idx) => (
+                            <p key={`${course.id}-mobile-${idx}`} className="text-gray-300 text-xs truncate">
                               • {course.title}
                             </p>
                           ))}

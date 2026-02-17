@@ -25,7 +25,11 @@ export default function HomePage() {
       
       programs.forEach(program => {
         if (program.courses && Array.isArray(program.courses)) {
-          allCourses.push(...program.courses)
+          // Type guard: filter out string IDs and keep Course objects
+          const courseObjects = program.courses.filter(
+            (c): c is Course => typeof c !== 'string' && c !== null && (c as Course)._id !== undefined
+          )
+          allCourses.push(...courseObjects)
         }
       })
 

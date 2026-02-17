@@ -88,10 +88,12 @@ export default function LoginPage() {
       lockoutData.lockedUntil = Date.now() + LOCKOUT_DURATION * 60 * 1000
       setIsLocked(true)
       setRemainingTime(LOCKOUT_DURATION)
-      toast.error(`Too many failed attempts. Locked for ${LOCKOUT_DURATION} minutes.`)
+      toast.error(`Too many failed attempts. Account locked for ${LOCKOUT_DURATION} minutes.`)
     } else {
       const remaining = MAX_LOGIN_ATTEMPTS - lockoutData.attempts
-      toast(`⚠️ ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`)
+      toast.error(`Login failed. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining before lockout.`, {
+        duration: 4000,
+      })
     }
 
     setLockoutData(lockoutData)
@@ -124,22 +126,76 @@ export default function LoginPage() {
 
     try {
       await login(sanitizedEmail, sanitizedPassword)
+      
+      // Clear lockout on successful login
       clearLockout()
-      toast.success('Login successful! Redirecting...')
-      if (rememberMe) localStorage.setItem('remember_email', sanitizedEmail)
+      
+      toast.success('Login successful! Redirecting...', {
+        icon: '✅',
+        duration: 2000,
+      })
+      
+      // Save email if remember me is checked
+      if (rememberMe) {
+        localStorage.setItem('remember_email', sanitizedEmail)
+      } else {
+        localStorage.removeItem('remember_email')
+      }
     } catch (err: any) {
-      const errorMessage = err.message || 'Invalid email or password'
+      console.error('Login error:', err)
+      
+      // Extract error message from backend response
+      let errorMessage = 'Login failed. Please try again.'
+      
+      // Check for specific error messages from backend
+      if (err.message) {
+        errorMessage = err.message
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
+      } else if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      }
+      
+      // Map backend error messages to user-friendly messages
+      if (errorMessage.toLowerCase().includes('invalid credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+      } else if (errorMessage.toLowerCase().includes('account is not active')) {
+        errorMessage = 'Your account is not active. Please contact support for assistance.'
+      } else if (errorMessage.toLowerCase().includes('account locked') || errorMessage.toLowerCase().includes('too many')) {
+        errorMessage = 'Account temporarily locked due to too many failed attempts.'
+      } else if (errorMessage.toLowerCase().includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.'
+      } else if (errorMessage.toLowerCase().includes('server')) {
+        errorMessage = 'Server error. Please try again later.'
+      }
+      
+      // Show error toast
+      toast.error(errorMessage, {
+        duration: 5000,
+        position: 'top-center',
+      })
+      
+      // Record failed attempt for lockout mechanism
       recordFailedAttempt(sanitizedEmail)
-      toast.error(errorMessage)
     }
   }
 
-  const handleGoogleLogin = () => { toast('Google login clicked'); console.log('Google login') }
-  const handleGithubLogin = () => { toast('GitHub login clicked'); console.log('GitHub login') }
+  const handleGoogleLogin = () => { 
+    toast('Google login coming soon!', { icon: '🚧' })
+    console.log('Google login') 
+  }
+  
+  const handleGithubLogin = () => { 
+    toast('GitHub login coming soon!', { icon: '🚧' })
+    console.log('GitHub login') 
+  }
 
   useEffect(() => {
     const rememberedEmail = localStorage.getItem('remember_email')
-    if (rememberedEmail) { setEmail(rememberedEmail); setRememberMe(true) }
+    if (rememberedEmail) { 
+      setEmail(rememberedEmail)
+      setRememberMe(true) 
+    }
   }, [])
 
   if (loading && user) {
@@ -284,6 +340,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   disabled={loading || isLocked}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -227,23 +227,43 @@ selfEnroll: async (programId: string, data?: SelfEnrollData) => {
   /**
    * Get enrollment statistics
    */
-  getEnrollmentStats: async (programId?: string) => {
-    try {
-      const params = programId ? { programId } : {}
-      const response = await axiosClient.get('/enrollments/stats/overview', { params })
-      return {
-        success: true,
-        data: response.data.data,
-      }
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.message,
-        data: null,
-      }
+getEnrollmentStats: async (programId?: string, courseId?: string) => {
+  try {
+    const params = new URLSearchParams();
+    
+    // ✅ Only add params if they're actually defined and not null/undefined
+    if (programId && programId !== 'undefined' && programId !== 'null') {
+      params.append('programId', programId);
+      console.log('📊 Fetching stats for programId:', programId);
     }
-  },
-
+    
+    if (courseId && courseId !== 'undefined' && courseId !== 'null') {
+      params.append('courseId', courseId);
+      console.log('📊 Fetching stats for courseId:', courseId);
+    }
+    
+    // ✅ Add timestamp to bypass cache
+    params.append('_t', Date.now().toString());
+    
+    const queryString = params.toString();
+    const url = `/enrollments/stats/overview${queryString ? `?${queryString}` : ''}`;
+    
+    console.log('📊 Requesting stats from:', url);
+    
+    const { data } = await axiosClient.get(url);
+    
+    console.log('✅ Stats response:', data);
+    
+    return data;
+  } catch (error: any) {
+    console.error('❌ Failed to fetch enrollment stats:', error);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message || 'Failed to fetch stats',
+      data: null
+    };
+  }
+},
 
    /**
    * Bulk enroll students in a program (Admin)

@@ -1,0 +1,315 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import InstructorSidebar from "@/components/dashboard/InstructorSide";
+import { useAuth } from "@/lib/context/AuthContext";
+import {
+  Bell, RefreshCw, Check, CheckCheck, Trash2,
+  Search, BookOpen, FileText, Award,
+  AlertTriangle, Info, Megaphone, Users,
+  ClipboardCheck, X,
+} from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+
+const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
+  announcement:       { icon: Megaphone,       color: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/30",      label: "Announcement" },
+  assessment_due:     { icon: FileText,        color: "text-yellow-400",  bg: "bg-yellow-500/10 border-yellow-500/30",  label: "Submission" },
+  assessment_graded:  { icon: Award,           color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30",label: "Graded" },
+  course_update:      { icon: BookOpen,        color: "text-cyan-400",    bg: "bg-cyan-500/10 border-cyan-500/30",      label: "Course" },
+  enrollment:         { icon: Users,           color: "text-violet-400",  bg: "bg-violet-500/10 border-violet-500/30",  label: "Enrollment" },
+  submission:         { icon: ClipboardCheck,  color: "text-orange-400",  bg: "bg-orange-500/10 border-orange-500/30",  label: "New Submission" },
+  warning:            { icon: AlertTriangle,   color: "text-red-400",     bg: "bg-red-500/10 border-red-500/30",        label: "Warning" },
+  info:               { icon: Info,            color: "text-gray-400",    bg: "bg-gray-500/10 border-gray-500/30",      label: "Info" },
+};
+
+const getTypeConfig = (type?: string) =>
+  TYPE_CONFIG[type?.toLowerCase() ?? ""] ?? TYPE_CONFIG.info;
+
+function timeAgo(date: string) {
+  const diff = (Date.now() - new Date(date).getTime()) / 1000;
+  if (diff < 60)    return `${Math.floor(diff)}s ago`;
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return new Date(date).toLocaleDateString();
+}
+
+async function apiFetch(path: string, opts: RequestInit = {}) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(`${API_URL}${path}`, {
+    ...opts,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers ?? {}),
+    },
+  });
+  return res.json();
+}
+
+export default function InstructorNotificationsPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
+
+  const [rows,        setRows]        = useState<any[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [unreadOnly,  setUnreadOnly]  = useState(false);
+  const [search,      setSearch]      = useState("");
+  const [page,        setPage]        = useState(1);
+  const [total,       setTotal]       = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const limit = 15;
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [notifRes, unreadRes] = await Promise.all([
+        apiFetch(`/notifications?page=${page}&limit=${limit}${unreadOnly ? "&unreadOnly=true" : ""}`),
+        apiFetch(`/notifications?page=1&limit=1&unreadOnly=true`),
+      ]);
+      if (notifRes.success) { setRows(notifRes.data || []); setTotal(notifRes.total || 0); }
+      if (unreadRes.success) setUnreadCount(unreadRes.total ?? 0);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, unreadOnly]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== "instructor") { router.push("/dashboard"); return; }
+    void fetchAll();
+  }, [authLoading, isAuthenticated, user?.role, fetchAll]);
+
+  const markRead = async (id: string) => {
+    await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
+    void fetchAll();
+  };
+
+  const markAllRead = async () => {
+    await apiFetch("/notifications/read-all", { method: "PATCH" });
+    void fetchAll();
+  };
+
+  const remove = async (id: string) => {
+    await apiFetch(`/notifications/${id}`, { method: "DELETE" });
+    void fetchAll();
+  };
+
+  const pages     = Math.max(1, Math.ceil(total / limit));
+  const readCount = total - unreadCount;
+
+  const filtered = search.trim()
+    ? rows.filter(n =>
+        (n.title   ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (n.message ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : rows;
+
+  // Group visible notifications by today / yesterday / older
+  const groups = filtered.reduce<Record<string, any[]>>((acc, n) => {
+    const d   = new Date(n.createdAt);
+    const now = new Date();
+    let bucket: string;
+
+    if (d.toDateString() === now.toDateString()) {
+      bucket = "Today";
+    } else {
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      bucket = d.toDateString() === yesterday.toDateString() ? "Yesterday" : d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    }
+
+    acc[bucket] = acc[bucket] ?? [];
+    acc[bucket].push(n);
+    return acc;
+  }, {});
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex overflow-hidden">
+      <InstructorSidebar />
+      <div className="flex-1 lg:ml-64 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+
+        {/* ── Header ── */}
+        <header className="mb-8">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                  <Bell size={24} className="text-blue-400" />
+                </div>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Notifications</h1>
+                <p className="text-gray-400 text-sm mt-0.5">
+                  {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"} · {total} total
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => void fetchAll()}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-gray-700 rounded-xl text-white flex items-center gap-2 text-sm transition-all">
+                <RefreshCw size={14} /> Refresh
+              </button>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white text-sm font-medium flex items-center gap-2 transition-all">
+                  <CheckCheck size={14} /> Mark all read
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── Stats ── */}
+          <div className="grid grid-cols-3 gap-4 mt-6">
+            {[
+              { label: "Total",  value: total,       color: "text-white",       bg: "from-slate-800/60 to-slate-800/40",   border: "border-slate-700/50" },
+              { label: "Unread", value: unreadCount, color: "text-blue-400",    bg: "from-blue-900/20 to-blue-900/10",     border: "border-blue-500/30" },
+              { label: "Read",   value: readCount,   color: "text-emerald-400", bg: "from-emerald-900/20 to-emerald-900/10", border: "border-emerald-500/30" },
+            ].map(s => (
+              <div key={s.label} className={`bg-gradient-to-br ${s.bg} border ${s.border} rounded-2xl p-4`}>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{s.label}</p>
+                <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </header>
+
+        {/* ── Filters ── */}
+        <div className="bg-slate-800/40 border border-gray-700/50 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search notifications…"
+              className="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <label className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-900 border border-gray-700 rounded-xl cursor-pointer hover:border-blue-500/50 transition-all">
+            <input
+              type="checkbox"
+              checked={unreadOnly}
+              onChange={e => { setUnreadOnly(e.target.checked); setPage(1); }}
+              className="accent-blue-500 w-4 h-4"
+            />
+            <span className="text-sm text-gray-300 whitespace-nowrap">Unread only</span>
+          </label>
+        </div>
+
+        {/* ── Notification list, grouped by day ── */}
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-slate-800/40 border border-gray-700/50 rounded-2xl p-16 text-center">
+            <Bell size={40} className="text-gray-700 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">
+              {search || unreadOnly ? "No notifications match your filters" : "No notifications yet"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groups).map(([dateLabel, items]) => (
+              <div key={dateLabel}>
+                {/* Day separator */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex-1 h-px bg-gray-800" />
+                  <span className="text-xs text-gray-600 font-semibold uppercase tracking-wider px-2">{dateLabel}</span>
+                  <div className="flex-1 h-px bg-gray-800" />
+                </div>
+
+                <div className="bg-slate-800/40 border border-gray-700/50 rounded-2xl overflow-hidden">
+                  <ul className="divide-y divide-gray-700/50">
+                    {items.map(n => {
+                      const cfg  = getTypeConfig(n.type);
+                      const Icon = cfg.icon;
+                      return (
+                        <li
+                          key={n._id}
+                          className={`group flex items-start gap-4 p-5 transition-all hover:bg-slate-800/60 ${
+                            !n.isRead ? "border-l-2 border-blue-500" : "border-l-2 border-transparent"
+                          }`}
+                        >
+                          {/* Type icon */}
+                          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${cfg.bg}`}>
+                            <Icon size={18} className={cfg.color} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                  <p className={`text-sm font-semibold leading-snug ${n.isRead ? "text-gray-300" : "text-white"}`}>
+                                    {n.title || "Notification"}
+                                  </p>
+                                  <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${cfg.bg} ${cfg.color}`}>
+                                    {cfg.label}
+                                  </span>
+                                  {!n.isRead && (
+                                    <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-400 leading-relaxed">{n.message}</p>
+                              </div>
+                              <span className="text-xs text-gray-600 whitespace-nowrap shrink-0">{timeAgo(n.createdAt)}</span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {!n.isRead && (
+                                <button onClick={() => markRead(n._id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-blue-600/20 border border-gray-600 hover:border-blue-500/50 rounded-lg text-xs text-gray-300 hover:text-blue-300 transition-all">
+                                  <Check size={12} /> Mark read
+                                </button>
+                              )}
+                              <button onClick={() => remove(n._id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-red-600/20 border border-gray-600 hover:border-red-500/50 rounded-lg text-xs text-gray-300 hover:text-red-400 transition-all">
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pages > 1 && (
+          <div className="mt-6 flex items-center justify-between text-sm text-gray-400 bg-slate-800/40 border border-gray-700/50 rounded-2xl px-5 py-4">
+            <span>Page {page} of {pages} · {total} total</span>
+            <div className="flex gap-2">
+              <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">
+                Prev
+              </button>
+              <button disabled={page === pages} onClick={() => setPage(p => Math.min(pages, p + 1))}
+                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

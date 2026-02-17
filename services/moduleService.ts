@@ -64,13 +64,14 @@ export const moduleService = {
   // CREATE MODULE
   // =========================
   createModule: async (data: {
-    course: string
+    courseId: string
     title: string
     description: string
     learningObjectives?: string[]
+    weekNumber?: number
     sequenceLabel?: string
     estimatedMinutes?: number
-    type?: 'core' | 'supplementary' | 'project' | 'assessment'
+    type?: 'core' | 'capstone' | 'project' | 'assessment'
     order?: number
   }): Promise<ApiResponse<any>> => {
     try {

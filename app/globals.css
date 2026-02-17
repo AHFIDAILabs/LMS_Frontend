@@ -8,6 +8,25 @@
 /* =========================
    BASE
    ========================= */
+
+   /* Prevent horizontal scroll everywhere */
+html, body, #__next {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Safety for flex children that might overflow */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Helpful: in flex containers, prevent children from expanding past container */
+.min-w-0 {
+  min-width: 0;
+}
+
 @layer base {
   * {
     @apply border-gray-800;
@@ -144,4 +163,82 @@
   .glow-text {
     text-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
   }
+}
+
+/* Add this to your global CSS file (globals.css or tailwind.css) */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+/* Syntax highlighting for code blocks */
+.syntax-keyword {
+  color: #c792ea;
+}
+
+.syntax-string {
+  color: #c3e88d;
+}
+
+.syntax-comment {
+  color: #697098;
+  font-style: italic;
+}
+
+.syntax-function {
+  color: #82aaff;
+}
+
+.syntax-number {
+  color: #f78c6c;
+}
+
+/* Smooth scrolling for navigation */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for code blocks */
+pre::-webkit-scrollbar {
+  height: 8px;
+  background: rgba(30, 41, 59, 0.5);
+}
+
+pre::-webkit-scrollbar-thumb {
+  background: rgba(132, 204, 22, 0.3);
+  border-radius: 4px;
+}
+
+pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(132, 204, 22, 0.5);
+}
+
+/* Gradient text animation */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
 }

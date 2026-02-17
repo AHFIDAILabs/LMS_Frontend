@@ -5,12 +5,16 @@ import { useRouter } from 'next/navigation'
 import InstructorSidebar from '@/components/dashboard/InstructorSide'
 import { usePrograms } from '@/hooks/useProgram'
 import { instructorService } from '@/services/instructorService'
+import { hybridAIService } from '@/services/hybridAIService'
+import { Sparkles, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function CreateCoursePage() {
   const router = useRouter()
   const { programs, loading: programsLoading } = usePrograms({ isPublished: true })
 
   const [loading, setLoading] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [coverFile, setCoverFile] = useState<File | null>(null)
@@ -45,17 +49,74 @@ export default function CreateCoursePage() {
     setForm({ ...form, [type]: updated })
   }
 
+  // AI Generate Course Structure
+  const handleAIGenerate = async () => {
+    if (!form.title.trim()) {
+      toast.error('Please enter a course title first')
+      return
+    }
+
+    if (!form.programId) {
+      toast.error('Please select a program first')
+      return
+    }
+
+    try {
+      setAiGenerating(true)
+      toast.loading('AI is generating course structure...', { id: 'ai-gen' })
+
+      // Get selected program for context
+      const selectedProgram = programs.find(p => p._id === form.programId)
+      const programContext = selectedProgram 
+        ? `This course is part of the "${selectedProgram.title}" program. ${selectedProgram.description || ''}`
+        : ''
+
+      const aiResult = await hybridAIService.generateCourseStructure(
+        form.title,
+        programContext,
+        form.description || undefined,
+        form.hours ? parseInt(form.hours) : undefined
+      )
+
+      // Update form with AI suggestions
+      setForm(prev => ({
+        ...prev,
+        title: aiResult.title || prev.title,
+        description: aiResult.description || prev.description,
+        hours: aiResult.estimatedHours?.toString() || prev.hours,
+        targetAudience: aiResult.targetAudience || prev.targetAudience,
+        objectives: aiResult.objectives && aiResult.objectives.length > 0 
+          ? aiResult.objectives 
+          : prev.objectives,
+        prerequisites: aiResult.prerequisites && aiResult.prerequisites.length > 0 
+          ? aiResult.prerequisites 
+          : prev.prerequisites,
+      }))
+
+      toast.success('AI generated course structure!', { id: 'ai-gen' })
+      
+      // Show learning objectives if available
+      if (aiResult.objectives) {
+        toast.success(
+          `Learning Objectives:\n${aiResult.objectives.slice(0, 3).join('\n')}`,
+          { duration: 5000 }
+        )
+      }
+    } catch (err: any) {
+      console.error('AI generation error:', err)
+      toast.error('Failed to generate with AI. Please fill manually.', { id: 'ai-gen' })
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      // 🔍 Debug: Log form state
       console.log('🔍 Form state before submit:', form)
-      console.log('🔍 programId value:', form.programId)
-      console.log('🔍 programId type:', typeof form.programId)
-      console.log('🔍 programId truthy?:', !!form.programId)
       
       // Validate required fields
       if (!form.title.trim()) {
@@ -127,46 +188,25 @@ export default function CreateCoursePage() {
         }
       }
 
-      // Verify all required fields are present
-      const hasTitle = formData.has('title')
-      const hasDescription = formData.has('description')
-      const hasSlug = formData.has('slug')
-      const hasProgram = formData.has('program')
-      
-      console.log('✅ Required fields check:', {
-        title: hasTitle,
-        description: hasDescription,
-        slug: hasSlug,
-        program: hasProgram
-      })
-
-      if (!hasTitle || !hasDescription || !hasSlug || !hasProgram) {
-        console.error('❌ Missing required fields in FormData!')
-        setError('Missing required fields. Please check all required fields.')
-        setLoading(false)
-        return
-      }
-
       const res = await instructorService.createCourse(formData)
 
       if (res.success) {
         console.log('✅ Course created successfully:', res.data)
+        toast.success('Course created successfully!')
         router.push(`/dashboard/instructor/courses/${res.data._id}`)
       } else {
         console.error('❌ Create course failed:', res.error)
         setError(res.error || 'Failed to create course')
+        toast.error(res.error || 'Failed to create course')
       }
     } catch (err: any) {
       console.error('❌ Error:', err)
       setError(err.message || 'Failed to create course')
+      toast.error(err.message || 'Failed to create course')
     } finally {
       setLoading(false)
     }
   }
-
-  // 🔍 Debug: Log when programs load
-  console.log('🔍 Programs loaded:', programs.length, 'programs')
-  console.log('🔍 Programs loading?:', programsLoading)
 
   return (
     <div className="min-h-screen bg-slate-950 flex">
@@ -174,7 +214,32 @@ export default function CreateCoursePage() {
 
       <div className="flex-1 ml-64 px-6 py-10">
         <div className="max-w-3xl mx-auto bg-slate-900/60 border border-gray-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold text-white mb-6">Create Course</h1>
+          {/* Header with AI Button */}
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-2">Create Course</h1>
+              <p className="text-gray-400 text-sm">Fill in the details or use AI to generate structure</p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleAIGenerate}
+              disabled={aiGenerating || !form.title.trim() || !form.programId}
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl text-sm"
+            >
+              {aiGenerating ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  AI Generate
+                </>
+              )}
+            </button>
+          </div>
 
           {error && <ErrorBox message={error} />}
 
@@ -187,16 +252,10 @@ export default function CreateCoursePage() {
               required 
               placeholder="e.g., Introduction to Machine Learning"
             />
+            <p className="text-xs text-gray-500 -mt-4">
+              Enter a title and select a program, then click "AI Generate" to auto-fill
+            </p>
             
-            <Textarea 
-              label="Description" 
-              name="description" 
-              value={form.description} 
-              onChange={handleChange} 
-              required 
-              placeholder="Describe what students will learn in this course..."
-            />
-
             {/* Program - REQUIRED */}
             <Select
               label="Program"
@@ -211,9 +270,18 @@ export default function CreateCoursePage() {
             {/* 🔍 Debug: Show selected program */}
             {form.programId && (
               <div className="text-xs text-emerald-400 -mt-4">
-                ✓ Selected program ID: {form.programId}
+                ✓ Selected program: {programs.find(p => p._id === form.programId)?.title}
               </div>
             )}
+
+            <Textarea 
+              label="Description" 
+              name="description" 
+              value={form.description} 
+              onChange={handleChange} 
+              required 
+              placeholder="Describe what students will learn in this course..."
+            />
 
             <Input 
               label="Target Audience" 

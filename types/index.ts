@@ -358,6 +358,10 @@ export interface Module {
   courseId: string
   title: string
   description: string
+  weekNumber: number
+  learningObjectives: string[]
+  sequenceLabel?: string
+  estimatedMinutes?: number
   order: number
   lessons: Lesson[]
   duration: number // in minutes
@@ -369,6 +373,7 @@ export interface Module {
 export interface ModuleCreate {
   title: string
   description: string
+  courseId: string
   order: number
 }
 
@@ -571,48 +576,71 @@ export type Instructor = {
 export interface Program {
   _id: string
   title: string
-  name: string // Alias for title
   slug: string
   description: string
   category?: string
   tags?: string[]
-  courses: Course[]
-  level?: string
-  objectives? : string[];
+  objectives?: string[]
+  level?: string[] // ["beginner", "intermediate", "advanced"]
+  
+  courses: string[] | Course[] // Can be IDs or populated Course objects
   order: number
   estimatedHours?: number
-  duration?: number // in weeks
-  instructors: Instructor[]
+  
+  instructors: string[] | Instructor[] // Can be IDs or populated Instructor objects
   coverImage?: string
   bannerImage?: string
+  
   price?: number
   currency?: string
   enrollmentLimit?: number
-  enrollmentCount?: number
+  enrollmentCount?: number // Virtual field from backend
   isPublished: boolean
+  
   startDate?: string
   endDate?: string
   isSelfPaced?: boolean
+  
   certificateTemplate?: string
-  approvalStatus: 'pending' | 'approved' | 'rejected'
   prerequisites?: string[]
   targetAudience?: string
+  
+  createdBy: string | User
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+  
   createdAt: string
   updatedAt: string
 }
 
 export interface ProgramPayload {
   title: string
+  slug?: string // Auto-generated from title if not provided
   description: string
   category?: string
   tags?: string[]
-  instructors?: string[]
+  objectives?: string[]
+  level?: string[] // ["beginner", "intermediate", "advanced"]
+  
+  courses?: string[] // Array of course IDs
+  order?: number
+  estimatedHours?: number
+  
+  instructors?: string[] // Array of instructor (user) IDs
+  coverImage?: string
+  bannerImage?: string
+  
   price?: number
   currency?: string
+  enrollmentLimit?: number
+  isPublished?: boolean
+  
+  startDate?: string
+  endDate?: string
+  isSelfPaced?: boolean
+  
+  certificateTemplate?: string
   prerequisites?: string[]
   targetAudience?: string
-  estimatedHours?: number
-  duration?: number
 }
 
 // ============= SUBMISSION =============

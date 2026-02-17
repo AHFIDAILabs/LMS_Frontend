@@ -269,4 +269,35 @@ export const studentService = {
       };
     }
   },
+
+  // =====================================================
+// LESSON ACTIONS (student)
+// =====================================================
+startLesson: async (lessonId: string): Promise<ApiResponse<any>> => {
+  try {
+    const response = await axiosClient.post(`/lessons/${lessonId}/start`);
+    return { success: true, data: response.data.data };
+  } catch (error: any) {
+    return {
+      success: false,
+      data: null as any,
+      error: error.response?.data?.error || error.message || 'Failed to start lesson',
+    };
+  }
+},
+
+completeLesson: async (lessonId: string, timeSpentMinutes = 0): Promise<ApiResponse<any>> => {
+  try {
+    const response = await axiosClient.post(`/lessons/${lessonId}/complete`, { timeSpent: timeSpentMinutes });
+    return { success: true, data: response.data.data };
+  } catch (error: any) {
+    return {
+      success: false,
+      data: null as any,
+      error: error.response?.data?.error || error.message || 'Failed to complete lesson',
+    };
+  }
+},
 };
+
+

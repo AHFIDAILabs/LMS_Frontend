@@ -139,6 +139,84 @@ export default function InstructorContentPage() {
     setRecent(merged.slice(0, 6));
   };
 
+
+  const loadAllContentData = async () => {
+  const [modRes, lesRes, asmRes] = await Promise.all([
+    instructorService.getInstructorModules(),
+    instructorService.getInstructorLessons(),
+    instructorService.getInstructorAssessments(),
+  ]);
+
+  // Stats
+  const modules     = modRes?.count ?? (modRes?.data?.length ?? 0);
+  const lessons     = lesRes?.count ?? (lesRes?.data?.length ?? 0);
+  const assessments = asmRes?.count ?? (asmRes?.data?.length ?? 0);
+
+  setStats({
+    modules,
+    lessons,
+    assessments,
+    totalContent: modules + lessons + assessments,
+  });
+
+  // Recent activity — built from the same responses, no extra calls
+  const recentModules     = (modRes?.data ?? []).slice(0, 3);
+  const recentLessons     = (lesRes?.data ?? []).slice(0, 3);
+  const recentAssessments = (asmRes?.data ?? []).slice(0, 3);
+
+  const modItems: ActivityItem[] = recentModules.map((m: any) => ({
+    type: "module",
+    title: m.title,
+    action: "updated",
+    time: new Date(m.updatedAt || m.createdAt).toLocaleString(),
+    icon: Layers,
+    color: "text-blue-400",
+  }));
+
+  const lessonItems: ActivityItem[] = recentLessons.map((l: any) => ({
+    type: "lesson",
+    title: l.title,
+    action: "updated",
+    time: new Date(l.updatedAt || l.createdAt).toLocaleString(),
+    icon: Video,
+    color: "text-purple-400",
+  }));
+
+  const assessmentItems: ActivityItem[] = recentAssessments.map((a: any) => ({
+    type: "assessment",
+    title: a.title,
+    action: "updated",
+    time: new Date(a.updatedAt || a.createdAt).toLocaleString(),
+    icon: FileText,
+    color: "text-emerald-400",
+  }));
+
+  const merged = [...modItems, ...lessonItems, ...assessmentItems].sort(
+    (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+  );
+  setRecent(merged.slice(0, 6));
+};
+
+// Then in useEffect:
+useEffect(() => {
+  if (authLoading) return;
+  if (!isAuthenticated || !isInstructor) {
+    router.push("/dashboard");
+    return;
+  }
+  (async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await loadAllContentData();  // ✅ single merged call
+    } catch (err: any) {
+      setError(err?.message || "Failed to load content overview");
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [authLoading, isAuthenticated, isInstructor]);
+
   const contentSections = useMemo(
     () => [
       {

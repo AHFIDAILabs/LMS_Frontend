@@ -6,6 +6,7 @@ import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { courseService } from '@/services/courseService'
 import { programService } from '@/services/programService'
+import { Program } from '@/types'
 import {
   ArrowLeft,
   Upload,
@@ -14,12 +15,6 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
-
-interface Program {
-  _id: string
-  name: string
-  title?: string
-}
 
 export default function CreateCoursePage() {
   const router = useRouter()
@@ -369,7 +364,7 @@ export default function CreateCoursePage() {
                       <option value="">Select program</option>
                       {programs.map(program => (
                         <option key={program._id} value={program._id}>
-                          {program.name || program.title}
+                          {program.title}
                         </option>
                       ))}
                     </select>

@@ -5,23 +5,56 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Navbar } from '@/components/layout/NavBar'
 import { Footer } from '@/components/layout/Footer'
-import { Loader2, Users, BookOpen, Target, CheckCircle2, Award, GraduationCap, ArrowRight, Play, Lock } from 'lucide-react'
+import { 
+  Loader2, Users, BookOpen, Target, CheckCircle2, Award, 
+  GraduationCap, ArrowRight, Play, Lock, ChevronDown, ChevronUp,
+  Clock, FileText, Video
+} from 'lucide-react'
 import { programService } from '@/services/programService'
 import { enrollmentService } from '@/services/enrollmentService'
 import { Program } from '@/types'
 import Link from 'next/link'
 import { EnrollmentModal } from '@/components/modals/EnrollmentModal'
 
+interface CourseWithModules {
+  _id: string
+  title: string
+  description: string
+  order: number
+  estimatedHours?: number
+  modules?: Module[]
+}
+
+interface Module {
+  _id: string
+  title: string
+  description?: string
+  order: number
+  lessons?: Lesson[]
+}
+
+interface Lesson {
+  _id: string
+  title: string
+  description?: string
+  order: number
+  duration?: number
+  type?: string
+}
+
 export default function ProgramDetailPage() {
   const params = useParams()
   const slug = params.slug as string
 
   const [program, setProgram] = useState<Program | null>(null)
+  const [courses, setCourses] = useState<CourseWithModules[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isEnrolled, setIsEnrolled] = useState(false)
   const [checkingEnrollment, setCheckingEnrollment] = useState(true)
   const [showEnrollmentModal, setShowEnrollmentModal] = useState(false)
+  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(new Set())
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
 
   // Check if user is enrolled in this program
   useEffect(() => {
@@ -43,26 +76,115 @@ export default function ProgramDetailPage() {
     checkEnrollment()
   }, [program])
 
+  // Fetch program and its courses
   useEffect(() => {
-    const fetchProgram = async () => {
+    const fetchProgramData = async () => {
       if (!slug) return
+      
       setLoading(true)
-      const res = await programService.getProgramBySlug(slug)
-      if (res.success && res.data) {
-        setProgram(res.data)
-        setError(null)
-      } else {
-        setProgram(null)
-        setError(res.error || 'Program not found')
+      setError(null)
+
+      try {
+        // Fetch program details
+        const programRes = await programService.getProgramBySlug(slug)
+        
+        if (!programRes.success || !programRes.data) {
+          setError(programRes.error || 'Program not found')
+          setLoading(false)
+          return
+        }
+
+        setProgram(programRes.data)
+
+        // Fetch courses for this program
+        // You might need to adjust this based on your API
+        // Option 1: If program data includes course IDs
+        if (programRes.data.courses && programRes.data.courses.length > 0) {
+          // If courses are populated objects
+          if (typeof programRes.data.courses[0] === 'object') {
+            // Transform courses to match CourseWithModules type
+            const transformedCourses: CourseWithModules[] = programRes.data.courses.map((course: any) => ({
+              _id: course._id,
+              title: course.title,
+              description: course.description || '',
+              order: course.order || 0,
+              estimatedHours: course.estimatedHours,
+              modules: Array.isArray(course.modules) && typeof course.modules[0] === 'object' 
+                ? course.modules 
+                : []
+            }))
+            setCourses(transformedCourses)
+          } else {
+            // If courses are just IDs, fetch each course
+            // This is where you'd call an API to get full course details
+            console.log('Courses are IDs, need to fetch full details')
+          }
+        }
+
+        // Option 2: If there's a separate endpoint to get program courses
+        // Uncomment and adjust if you have this endpoint:
+        /*
+        if (programRes.data._id) {
+          const coursesRes = await programService.getProgramCourses(programRes.data._id)
+          if (coursesRes.success && coursesRes.data) {
+            setCourses(coursesRes.data)
+          }
+        }
+        */
+
+      } catch (err) {
+        console.error('Error fetching program data:', err)
+        setError('Failed to load program details')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
-    fetchProgram()
+
+    fetchProgramData()
   }, [slug])
 
   const handleEnrollClick = () => {
     setShowEnrollmentModal(true)
   }
+
+  const toggleCourse = (courseId: string) => {
+    setExpandedCourses(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(courseId)) {
+        newSet.delete(courseId)
+      } else {
+        newSet.add(courseId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleModule = (moduleId: string) => {
+    setExpandedModules(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(moduleId)) {
+        newSet.delete(moduleId)
+      } else {
+        newSet.add(moduleId)
+      }
+      return newSet
+    })
+  }
+
+  // Calculate total lessons and duration
+  const totalLessons = courses.reduce((total, course) => {
+    return total + (course.modules?.reduce((moduleTotal, module) => {
+      return moduleTotal + (module.lessons?.length || 0)
+    }, 0) || 0)
+  }, 0)
+
+  const totalDuration = courses.reduce((total, course) => {
+    return total + (course.modules?.reduce((moduleTotal, module) => {
+      return moduleTotal + (module.lessons?.reduce((lessonTotal, lesson) => {
+        return lessonTotal + (lesson.duration || 0)
+      }, 0) || 0)
+    }, 0) || 0)
+  }, 0)
 
   if (loading) {
     return (
@@ -122,24 +244,34 @@ export default function ProgramDetailPage() {
 
               {/* CTA */}
               <div className="flex flex-wrap gap-4">
-                {(
+                {isEnrolled && (
                   <Link
-                    href={`/students/myProgram/${program._id}/learn`}
+                    href={`/dashboard/students/myProgram/${program._id}`}
                     className="px-8 py-4 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 group"
                   >
                     <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
                     Continue Learning
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
-                ) }
+                )}
                 
                 {!isEnrolled && (
-                  <Link
-                    href="/allPrograms"
-                    className="px-8 py-4 border border-white/20 hover:bg-white/5 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2"
-                  >
-                    Browse Other Programs
-                  </Link>
+                  <>
+                    <button
+                      onClick={handleEnrollClick}
+                      className="px-8 py-4 bg-[#FF6B35] hover:bg-[#FF6B35]/90 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2 group"
+                    >
+                      <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      Enroll Now
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    <Link
+                      href="/allPrograms"
+                      className="px-8 py-4 border border-white/20 hover:bg-white/5 rounded-xl font-semibold transition-all duration-300 flex items-center gap-2"
+                    >
+                      Browse Other Programs
+                    </Link>
+                  </>
                 )}
               </div>
             </motion.div>
@@ -169,13 +301,14 @@ export default function ProgramDetailPage() {
         </div>
       </section>
 
-      {/* Program Details */}
+      {/* Program Content */}
       <section className="px-4 py-16">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
+            {/* Learning Objectives */}
             {program.objectives && program.objectives.length > 0 && (
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
-                <h2 className="text-2xl font-bold mb-4">What You'll Learn</h2>
+                <h2 className="text-2xl font-bold mb-6">What You'll Learn</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   {program.objectives.map((obj, idx) => (
                     <div key={idx} className="flex items-start gap-3">
@@ -186,10 +319,121 @@ export default function ProgramDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Course Curriculum */}
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
+              <h2 className="text-2xl font-bold mb-6">Course Curriculum</h2>
+              
+              {courses.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpen className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No courses available yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {courses.sort((a, b) => a.order - b.order).map((course, courseIdx) => (
+                    <div key={course._id} className="border border-white/10 rounded-xl overflow-hidden">
+                      {/* Course Header */}
+                      <button
+                        onClick={() => toggleCourse(course._id)}
+                        className="w-full px-6 py-4 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-[#FF6B35]/20 flex items-center justify-center text-[#FF6B35] font-bold">
+                            {courseIdx + 1}
+                          </div>
+                          <div className="text-left">
+                            <h3 className="font-semibold text-lg">{course.title}</h3>
+                            <p className="text-sm text-gray-400">
+                              {course.modules?.length || 0} modules • {course.estimatedHours || 0} hours
+                            </p>
+                          </div>
+                        </div>
+                        {expandedCourses.has(course._id) ? (
+                          <ChevronUp className="w-5 h-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        )}
+                      </button>
+
+                      {/* Course Content */}
+                      {expandedCourses.has(course._id) && (
+                        <div className="px-6 py-4 space-y-3">
+                          {course.description && (
+                            <p className="text-gray-300 text-sm mb-4">{course.description}</p>
+                          )}
+
+                          {/* Modules */}
+                          {course.modules && course.modules.length > 0 ? (
+                            <div className="space-y-2">
+                              {course.modules.sort((a, b) => a.order - b.order).map((module, moduleIdx) => (
+                                <div key={module._id} className="border border-white/5 rounded-lg overflow-hidden">
+                                  {/* Module Header */}
+                                  <button
+                                    onClick={() => toggleModule(module._id)}
+                                    className="w-full px-4 py-3 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-xs font-semibold text-[#FF6B35]">
+                                        Module {moduleIdx + 1}
+                                      </span>
+                                      <span className="text-sm font-medium">{module.title}</span>
+                                      <span className="text-xs text-gray-400">
+                                        ({module.lessons?.length || 0} lessons)
+                                      </span>
+                                    </div>
+                                    {expandedModules.has(module._id) ? (
+                                      <ChevronUp className="w-4 h-4 text-gray-400" />
+                                    ) : (
+                                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                                    )}
+                                  </button>
+
+                                  {/* Lessons */}
+                                  {expandedModules.has(module._id) && module.lessons && (
+                                    <div className="px-4 py-2 space-y-1">
+                                      {module.lessons.sort((a, b) => a.order - b.order).map((lesson, lessonIdx) => (
+                                        <div
+                                          key={lesson._id}
+                                          className="flex items-center gap-3 py-2 px-3 hover:bg-white/5 rounded transition-all"
+                                        >
+                                          <div className="flex items-center gap-2 flex-1">
+                                            {lesson.type === 'video' ? (
+                                              <Video className="w-4 h-4 text-blue-400" />
+                                            ) : (
+                                              <FileText className="w-4 h-4 text-green-400" />
+                                            )}
+                                            <span className="text-sm text-gray-300">{lesson.title}</span>
+                                          </div>
+                                          {lesson.duration && (
+                                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                                              <Clock className="w-3 h-3" />
+                                              <span>{lesson.duration} min</span>
+                                            </div>
+                                          )}
+                                          {!isEnrolled && <Lock className="w-4 h-4 text-gray-500" />}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">No modules available</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Target Audience */}
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Users className="w-6 h-6 text-[#FF6B35]" />
@@ -198,23 +442,23 @@ export default function ProgramDetailPage() {
               <p className="text-gray-300">{program.targetAudience || 'Not specified'}</p>
             </div>
 
-            {/* Course Stats */}
+            {/* Program Stats */}
             <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
               <h3 className="text-xl font-bold mb-4">Program Details</h3>
               <div className="space-y-3">
-                {/* <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Price</span>
-                  <span className="font-semibold text-[#FF6B35]">
-                    {program.price === 0 ? 'Free' : `${program.currency === 'NGN' ? '₦' : '$'}${program.price?.toLocaleString()}`}
-                  </span>
-                </div> */}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Duration</span>
-                  <span className="font-semibold">{program.estimatedHours || 'Self-paced'}</span>
+                  <span className="font-semibold">
+                    {totalDuration > 0 ? `${Math.ceil(totalDuration / 60)} hours` : (program.estimatedHours || 'Self-paced')}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Courses</span>
-                  <span className="font-semibold">{program.courses?.length || 0} Courses</span>
+                  <span className="font-semibold">{courses.length} Courses</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Lessons</span>
+                  <span className="font-semibold">{totalLessons} Lessons</span>
                 </div>
               </div>
             </div>

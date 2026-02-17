@@ -1,10 +1,13 @@
+// app/dashboard/admin/courses/[id]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
+import { useEnrollmentStats } from '@/hooks/useEnrollmentStats'
 import { courseService } from '@/services/courseService'
+import { adminService } from '@/services/adminService'
 import { Course, CourseModule, Lesson } from '@/types'
 import {
   Book,
@@ -25,9 +28,10 @@ import {
   BookText,
   ListChecks,
   FolderKanban,
+  RefreshCw,
+  TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
-import { adminService } from '@/services/adminService'
 
 const LEVEL_COLORS: Record<string, string> = {
   beginner: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -49,6 +53,14 @@ export default function AdminCourseDetailPage() {
   const router = useRouter()
   const courseId = params?.id as string
   const { user, isAuthenticated, loading: authLoading } = useAuth()
+  
+  // ✅ Use enrollment stats hook for course-level stats
+  const { 
+    stats: enrollmentStats, 
+    loading: statsLoading,
+    error: statsError,
+    refresh: refreshStats 
+  } = useEnrollmentStats(undefined, courseId)
   
   const [course, setCourse] = useState<Course | null>(null)
   const [modules, setModules] = useState<CourseModule[]>([])
@@ -247,13 +259,25 @@ export default function AdminCourseDetailPage() {
                   </div>
                 </div>
                 
-                <Link
-                  href={`/dashboard/admin/courses/${course._id}/edit`}
-                  className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors"
-                >
-                  <Edit size={18} />
-                  Edit Course
-                </Link>
+                <div className="flex items-center gap-2">
+                  {/* ✅ Refresh Stats Button */}
+                  <button
+                    onClick={refreshStats}
+                    disabled={statsLoading}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors disabled:opacity-50"
+                    title="Refresh enrollment stats"
+                  >
+                    <RefreshCw size={18} className={statsLoading ? 'animate-spin' : ''} />
+                  </button>
+
+                  <Link
+                    href={`/dashboard/admin/courses/${course._id}/edit`}
+                    className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors"
+                  >
+                    <Edit size={18} />
+                    Edit Course
+                  </Link>
+                </div>
               </div>
 
               {/* Meta Info Grid */}
@@ -264,7 +288,9 @@ export default function AdminCourseDetailPage() {
                   </div>
                   <div>
                     <p className="text-gray-500 text-xs">Enrolled</p>
-                    <p className="text-white font-semibold">{course.currentEnrollment || 0}</p>
+                    <p className="text-white font-semibold">
+                      {enrollmentStats?.total || course.currentEnrollment || 0}
+                    </p>
                   </div>
                 </div>
 
@@ -328,6 +354,101 @@ export default function AdminCourseDetailPage() {
               )}
             </div>
           </div>
+
+          {/* ✅ Enrollment Stats Cards (Course-specific) */}
+          {enrollmentStats && (
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Users size={24} className="text-lime-400" />
+                  Enrollment Statistics
+                </h2>
+                <span className="text-sm text-gray-400">
+                  {enrollmentStats.total} total enrollments
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users size={16} className="text-gray-400" />
+                    <p className="text-gray-400 text-xs">Total</p>
+                  </div>
+                  <p className="text-2xl font-bold text-white">{enrollmentStats.total}</p>
+                </div>
+
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp size={16} className="text-blue-400" />
+                    <p className="text-gray-400 text-xs">Active</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-400">{enrollmentStats.active}</p>
+                </div>
+
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle size={16} className="text-emerald-400" />
+                    <p className="text-gray-400 text-xs">Completed</p>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-400">{enrollmentStats.completed}</p>
+                </div>
+
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock size={16} className="text-yellow-400" />
+                    <p className="text-gray-400 text-xs">Pending</p>
+                  </div>
+                  <p className="text-2xl font-bold text-yellow-400">{enrollmentStats.pending}</p>
+                </div>
+
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lock size={16} className="text-orange-400" />
+                    <p className="text-gray-400 text-xs">Suspended</p>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-400">{enrollmentStats.suspended}</p>
+                </div>
+
+                <div className="bg-slate-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users size={16} className="text-red-400" />
+                    <p className="text-gray-400 text-xs">Dropped</p>
+                  </div>
+                  <p className="text-2xl font-bold text-red-400">{enrollmentStats.dropped}</p>
+                </div>
+              </div>
+
+              {/* Completion Rate Bar */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-gray-400">Completion Rate</span>
+                  <span className="text-white font-semibold">{enrollmentStats.completionRate}%</span>
+                </div>
+                <div className="w-full bg-slate-700 rounded-full h-2">
+                  <div 
+                    className="bg-emerald-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${enrollmentStats.completionRate}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ Stats Loading/Error States */}
+          {statsLoading && !enrollmentStats && (
+            <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-6 text-center">
+              <div className="w-8 h-8 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">Loading enrollment statistics...</p>
+            </div>
+          )}
+
+          {statsError && (
+            <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-xl p-4">
+              <p className="text-yellow-400 text-sm">
+                Unable to load enrollment statistics. {statsError}
+              </p>
+            </div>
+          )}
 
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Main Content - Modules & Lessons */}
@@ -524,7 +645,7 @@ export default function AdminCourseDetailPage() {
                         </p>
                       )}
                       <Link
-                        href={`/dashboard/admin/programs/${course.program._id}`}
+                        href={`/dashboard/admin/programes/${course.program._id}`}
                         className="text-blue-400 hover:text-blue-300 text-sm mt-2 inline-block"
                       >
                         View Program →

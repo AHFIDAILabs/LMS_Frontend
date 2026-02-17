@@ -4,19 +4,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import AdminSidebar from '@/components/dashboard/AdminSidebar'
 import { useAuth } from '@/lib/context/AuthContext'
 import { programService } from '@/services/programService'
-import { Award, Eye, Edit, Trash2, Globe, Lock, Plus, BookOpen, Users } from 'lucide-react'
+import { Program } from '@/types'
+import { Award, Eye, Edit, Trash2, Globe, Lock, Plus, BookOpen, Users, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
-interface Program {
-  _id: string
-  name: string
-  description: string
-  category?: string
-  isPublished: boolean
-  courses?: any[]
-  enrollmentCount?: number
-  createdAt: string
-}
+
 
 export default function AdminProgramsPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth()
@@ -39,6 +32,8 @@ export default function AdminProgramsPage() {
       setLoading(true)
       setError(null)
       
+      console.log('🔄 Fetching programs with filter:', filterStatus)
+      
       const params: any = {}
       if (filterStatus !== 'all') {
         params.isPublished = filterStatus === 'published'
@@ -46,15 +41,27 @@ export default function AdminProgramsPage() {
 
       const response = await programService.getPrograms(params)
       
-      if (response.success && Array.isArray(response.data)) {
-        setPrograms(response.data)
+      console.log('📦 Programs response:', response)
+      
+      if (response.success) {
+        const programsData = Array.isArray(response.data) ? response.data : []
+        console.log('✅ Programs loaded:', programsData.length, programsData)
+        setPrograms(programsData)
+        
+        if (programsData.length === 0) {
+          toast('No programs found. Try creating one!', { icon: '📚' })
+        }
       } else {
+        console.error('❌ Failed to fetch programs:', response.error)
         setPrograms([])
         setError(response.error || 'Failed to fetch programs')
+        toast.error(response.error || 'Failed to fetch programs')
       }
     } catch (err: any) {
+      console.error('❌ Error fetching programs:', err)
       setPrograms([])
       setError(err.message || 'An error occurred')
+      toast.error(err.message || 'Failed to load programs')
     } finally {
       setLoading(false)
     }
@@ -65,16 +72,23 @@ export default function AdminProgramsPage() {
   }, [fetchPrograms])
 
   // Client-side filtered programs
-  const filteredPrograms = useMemo(() => {
+const filteredPrograms = useMemo(() => {
   const term = search.toLowerCase()
-  return programs.filter(
-    p =>
-      (p.name ?? '').toLowerCase().includes(term) ||
-      (p.description ?? '').toLowerCase().includes(term) ||
-      (p.category ?? '').toLowerCase().includes(term)
-  )
+  return programs.filter(p => {
+    // Use title as primary field (this is what's in the database)
+    const programTitle = p.title || ''
+    const programDesc = p.description || ''
+    const programCat = p.category || ''
+    const programTags = p.tags?.join(' ') || ''
+    
+    return (
+      programTitle.toLowerCase().includes(term) ||
+      programDesc.toLowerCase().includes(term) ||
+      programCat.toLowerCase().includes(term) ||
+      programTags.toLowerCase().includes(term)
+    )
+  })
 }, [programs, search])
-
 
   // Toggle publish status
   const handleTogglePublish = async (programId: string) => {
@@ -88,11 +102,14 @@ export default function AdminProgramsPage() {
             p._id === programId ? { ...p, isPublished: !p.isPublished } : p
           )
         )
+        toast.success('Program status updated!')
       } else {
         setError(response.error || 'Failed to toggle publish status')
+        toast.error(response.error || 'Failed to update status')
       }
     } catch (err: any) {
       setError(err.message || 'Failed to toggle publish status')
+      toast.error(err.message || 'Failed to update status')
     } finally {
       setActionLoading(null)
     }
@@ -110,11 +127,14 @@ export default function AdminProgramsPage() {
       
       if (response.success) {
         setPrograms(prev => prev.filter(p => p._id !== programId))
+        toast.success('Program deleted successfully!')
       } else {
         setError(response.error || 'Failed to delete program')
+        toast.error(response.error || 'Failed to delete program')
       }
     } catch (err: any) {
       setError(err.message || 'Failed to delete program')
+      toast.error(err.message || 'Failed to delete')
     } finally {
       setActionLoading(null)
     }
@@ -153,13 +173,23 @@ export default function AdminProgramsPage() {
             <p className="text-gray-400 mt-1">Manage all programs across the platform</p>
           </div>
           
-          <Link
-            href="/dashboard/admin/programes/create"
-            className="flex items-center gap-2 bg-lime-500 hover:bg-lime-600 text-slate-900 px-4 py-2 rounded-xl font-semibold transition-colors"
-          >
-            <Plus size={20} />
-            Create Program
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={fetchPrograms}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors"
+            >
+              <RefreshCw size={20} />
+              Refresh
+            </button>
+            
+            <Link
+              href="/dashboard/admin/programes/create"
+              className="flex items-center gap-2 bg-lime-500 hover:bg-lime-600 text-slate-900 px-4 py-2 rounded-xl font-semibold transition-colors"
+            >
+              <Plus size={20} />
+              Create Program
+            </Link>
+          </div>
         </div>
 
         {/* Filters and Search */}
@@ -217,14 +247,16 @@ export default function AdminProgramsPage() {
 
         {/* Program List */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-12 h-12 border-4 border-lime-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-12 h-12 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-gray-400">Loading programs...</p>
           </div>
         ) : filteredPrograms.length ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredPrograms.map(program => {
               const isActionLoading = actionLoading === program._id
               const courseCount = program.courses?.length || 0
+              const displayName = program.title || 'Untitled Program'
               
               return (
                 <div
@@ -234,7 +266,7 @@ export default function AdminProgramsPage() {
                   }`}
                 >
                   {/* Header with gradient */}
-                  <div className="relative h-32 bg-linear-to-br from-lime-500/20 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
+                  <div className="relative h-32 bg-gradient-to-br from-lime-500/20 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
                     <Award size={48} className="text-lime-400" />
                     
                     {/* Status badge */}
@@ -261,7 +293,7 @@ export default function AdminProgramsPage() {
                   <div className="p-6 space-y-4">
                     <div>
                       <h3 className="text-xl font-bold text-white mb-2">
-                        {program.name}
+                        {displayName}
                       </h3>
                       <p className="text-gray-400 text-sm line-clamp-2">
                         {program.description || 'No description available'}
@@ -294,7 +326,7 @@ export default function AdminProgramsPage() {
                       </Link>
                       
                       <Link
-                        href={`/dashboard/admin/programs/${program._id}/edit`}
+                        href={`/dashboard/admin/programes/${program._id}/edit`}
                         className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-sm transition-colors"
                       >
                         <Edit size={16} />
@@ -324,7 +356,7 @@ export default function AdminProgramsPage() {
                       </button>
                       
                       <button
-                        onClick={() => handleDeleteProgram(program._id, program.name)}
+                        onClick={() => handleDeleteProgram(program._id, displayName)}
                         disabled={isActionLoading}
                         className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors"
                       >
@@ -340,11 +372,21 @@ export default function AdminProgramsPage() {
         ) : (
           <div className="text-center py-12">
             <Award size={64} className="text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400 text-lg">No programs found.</p>
-            {search && (
-              <p className="text-gray-500 text-sm mt-2">
+            <p className="text-gray-400 text-lg mb-2">
+              {search ? 'No programs match your search.' : 'No programs found.'}
+            </p>
+            {search ? (
+              <p className="text-gray-500 text-sm">
                 Try adjusting your search or filters
               </p>
+            ) : (
+              <Link
+                href="/dashboard/admin/programes/create"
+                className="inline-flex items-center gap-2 bg-lime-500 hover:bg-lime-600 text-slate-900 px-6 py-3 rounded-xl font-semibold transition-colors mt-4"
+              >
+                <Plus size={20} />
+                Create Your First Program
+              </Link>
             )}
           </div>
         )}

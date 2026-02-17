@@ -78,28 +78,30 @@ export const authService = {
     }
   },
 
-  login: async (credentials: { email: string; password: string }): Promise<ServiceResponse> => {
-    try {
-      const res = await axiosClient.post<AuthResponse>('/auth/login', credentials)
-      const result = res.data
+ login: async (credentials: {email: string, password: string}): Promise<ServiceResponse> => {
+  try {
+    const response = await axiosClient.post<AuthResponse>(`/auth/login`, {
+      email: credentials.email,
+      password: credentials.password,
+    })
 
-      if (result.success === false) throw new Error(result.message)
-
-      if (result.accessToken) {
-        localStorage.setItem('authToken', result.accessToken)
-        if (result.refreshToken) localStorage.setItem('refreshToken', result.refreshToken)
-      }
-
-      return {
-        success: true,
-        token: result.accessToken,
-        refreshToken: result.refreshToken,
-        data: normaliseUser(result.user),
-      }
-    } catch (err) {
-      throw new Error(extractError(err))
+    const data = response.data
+    // Store tokens if login was successful
+    if (data.success && data.accessToken) {
+      localStorage.setItem('authToken', data.accessToken)
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken)
     }
-  },
+
+    return {
+      success: true,
+      data: data.user || data.data,
+      message: 'Login successful'
+    }
+  } catch (err) {
+    console.error('Login network error:', err) // Add this for debugging
+    throw new Error(extractError(err))
+  }
+},
 
   refreshToken: async (): Promise<ServiceResponse> => {
     try {
@@ -121,6 +123,12 @@ export const authService = {
     } catch (err) {
       throw new Error(extractError(err))
     }
+  },
+
+   // ✅ Add this method
+  getRefreshToken: (): string | null => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('refreshToken')
   },
 
   forgotPassword: (email: string) =>

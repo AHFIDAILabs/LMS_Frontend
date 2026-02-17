@@ -86,9 +86,9 @@ export default function AdminEnrollmentsPage() {
       }
 
       const [enrollmentsResponse, statsResponse] = await Promise.all([
-        enrollmentService.getAllEnrollments(params),
-        enrollmentService.getEnrollmentStats(),
-      ])
+  enrollmentService.getAllEnrollments(params),
+  enrollmentService.getEnrollmentStats(undefined, undefined), // ✅ Explicit undefined or remove the call
+])
 
       if (enrollmentsResponse.success && Array.isArray(enrollmentsResponse.data)) {
         setEnrollments(enrollmentsResponse.data)
@@ -341,7 +341,7 @@ export default function AdminEnrollmentsPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <BookOpen size={16} className="text-lime-400" />
-                        <h4 className="text-white font-semibold">{enrollment.program.title}</h4>
+                        <h4 className="text-white font-semibold">{enrollment.program.title || ""}</h4>
                       </div>
 
                       {/* Progress Bar */}

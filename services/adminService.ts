@@ -1,162 +1,252 @@
-
 // services/adminService.ts
 import { axiosClient } from '@/lib/axiosClient';
-import { fetchWithAuth, handleResponse, extractError } from '../lib/utils'; // assuming you move your helper functions to a utils file
-import {GetAllUsersResponse} from '@/types';
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'
+import { extractError } from '../lib/utils';
+import { GetAllUsersResponse } from '@/types';
+
+const API_PREFIX = '/admin';
 
 export const adminService = {
-
-
-  // ============================
-  // ADMIN  CREATE PROGRAM
-// ============================
-
   // =============================
   // USER MANAGEMENT (Admin Only)
   // =============================
   getAllUsers: async (params?: Record<string, string | number>) => {
-    const query = params ? `?${new URLSearchParams(params as any)}` : '';
-    const response = await fetchWithAuth(`${API_URL}/admin/users${query}`);
-    return handleResponse<GetAllUsersResponse>(response);
+    try {
+      const res = await axiosClient.get<GetAllUsersResponse>(`${API_PREFIX}/users`, { params });
+      return res.data; // { success, count, total, page, pages, data: User[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   getUserById: async (userId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}`);
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/users/${userId}`);
+      return res.data; // { success, data: { user, enrollments, progress, certificates } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   updateUser: async (userId: string, data: any) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.put(`${API_PREFIX}/users/${userId}`, data);
+      return res.data; // { success, message, data: user }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   deleteUser: async (userId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}`, {
-      method: 'DELETE',
-    });
-    return handleResponse(response);
-  },
-
-    // Admin-specific endpoint
-  getCourseById: async (courseId: string) => {
     try {
-      // ✅ Use admin endpoint that populates everything
-      const res = await axiosClient.get(`/admin/courses/${courseId}`)
-      return res.data
+      const res = await axiosClient.delete(`${API_PREFIX}/users/${userId}`);
+      return res.data; // { success, message }
     } catch (err) {
-      throw new Error(extractError(err))
+      throw new Error(extractError(err));
     }
   },
 
-  // Public endpoint (keep for student view)
-  getCourseByIdPublic: async (courseId: string) => {
-    try {
-      const res = await axiosClient.get(`/courses/${courseId}`)
-      return res.data
-    } catch (err) {
-      throw new Error(extractError(err))
-    }
-  },
   updateUserStatus: async (userId: string, status: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.patch(`${API_PREFIX}/users/${userId}/status`, { status });
+      return res.data; // { success, message, data: user }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   updateUserRole: async (userId: string, role: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/role`, {
-      method: 'PATCH',
-      body: JSON.stringify({ role }),
-    });
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.patch(`${API_PREFIX}/users/${userId}/role`, { role });
+      return res.data; // { success, message, data: user }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   // =============================
   // STUDENT MANAGEMENT
   // =============================
-  getAllStudents: async () => {
-    const response = await fetchWithAuth(`${API_URL}/admin/students`);
-    return handleResponse(response);
+  getAllStudents: async (params?: Record<string, string | number>) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/students`, { params });
+      return res.data; // { success, count, total, page, pages, data: User[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   getStudentProgress: async (studentId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/students/${studentId}/progress`);
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/students/${studentId}/progress`);
+      return res.data; // { success, data: { student, progress, enrollments } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   // =============================
   // INSTRUCTOR MANAGEMENT
   // =============================
   getAllInstructors: async () => {
-    const response = await fetchWithAuth(`${API_URL}/admin/instructors`);
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/instructors`);
+      return res.data; // { success, count, data: User[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
-promoteToInstructor: async (userId: string, programId?: string) => {
-  const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote-instructor`, {
-    method: 'PATCH',
-    body: JSON.stringify({ programId }),
-  });
-  return handleResponse(response);
-},
+  promoteToInstructor: async (userId: string, programId?: string) => {
+    try {
+      const res = await axiosClient.patch(`${API_PREFIX}/users/${userId}/promote-instructor`, { programId });
+      return res.data; // { success, data: user }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
 
   demoteToStudent: async (userId: string) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/users/${userId}/demote-instructor`, {
-      method: 'PATCH',
-    });
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.patch(`${API_PREFIX}/users/${userId}/demote-instructor`);
+      return res.data; // { success, data: user }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   // =============================
   // DASHBOARD
   // =============================
   getDashboardStats: async () => {
-    const response = await fetchWithAuth(`${API_URL}/admin/dashboard/stats`);
-    return handleResponse(response);
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/dashboard/stats`);
+      return res.data; // { success, data: { users, courses, enrollments, certificates, recentActivity } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  // =============================
+  // COURSES (Admin detail + public)
+  // =============================
+  getCourseById: async (courseId: string) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/courses/${courseId}`);
+      return res.data; // { success, data: { ...course, modules, stats } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  getCourseByIdPublic: async (courseId: string) => {
+    try {
+      const res = await axiosClient.get(`/courses/${courseId}`);
+      return res.data; // { success, data: { course, modules, stats } } (from public)
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   // =============================
   // BULK OPERATIONS
   // =============================
   bulkEnrollStudents: async (studentIds: string[], programId: string, cohort?: string) => {
-  const response = await fetch('/api/admin/bulk/enroll', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      studentIds, 
-      programId,  // Changed from courseId
-      cohort 
-    })
-  });
-  return response.json();
-},
+    try {
+      const res = await axiosClient.post(`${API_PREFIX}/bulk/enroll`, {
+        studentIds,
+        programId,
+        cohort,
+      });
+      return res.data; // { success, message, data: { enrolled, failed, enrollments, errors } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
 
-  bulkUpdateStatus: async (data: any) => {
-    const response = await fetchWithAuth(`${API_URL}/admin/bulk/status`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-    return handleResponse(response);
+  bulkUpdateStatus: async (data: { userIds: string[]; status: string }) => {
+    try {
+      const res = await axiosClient.patch(`${API_PREFIX}/bulk/status`, data);
+      return res.data; // { success, message, data: { matched, modified } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
   // =============================
   // REPORTS
   // =============================
-  getUserActivityReport: async () => {
-    const response = await fetchWithAuth(`${API_URL}/admin/reports/user-activity`);
-    return handleResponse(response);
+  getUserActivityReport: async (params?: Record<string, string>) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/reports/user-activity`, { params });
+      return res.data; // { success, count, data: users[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 
-  getCourseCompletionReport: async () => {
-    const response = await fetchWithAuth(`${API_URL}/admin/reports/course-completion`);
-    return handleResponse(response);
+  getCourseCompletionReport: async (params?: { courseId?: string }) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/reports/course-completion`, { params });
+      return res.data; // { success, count, data: completionData[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  // =============================
+  // PROGRAMS (Admin)
+  // =============================
+  createProgram: async (payload: any) => {
+    try {
+      const res = await axiosClient.post(`${API_PREFIX}/programs`, payload);
+      return res.data; // { success, message, data: program }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  getAllPrograms: async (params?: Record<string, string | number>) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/programs`, { params });
+      return res.data; // { success, count, total, page, pages, data: programs[] }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  getProgramById: async (id: string) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/programs/${id}`);
+      return res.data; // { success, data: { program, courses } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  updateProgram: async (id: string, payload: any) => {
+    try {
+      const res = await axiosClient.put(`${API_PREFIX}/programs/${id}`, payload);
+      return res.data; // { success, message, data: program }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  deleteProgram: async (id: string) => {
+    try {
+      const res = await axiosClient.delete(`${API_PREFIX}/programs/${id}`);
+      return res.data; // { success, message }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  getProgramProgress: async (id: string) => {
+    try {
+      const res = await axiosClient.get(`${API_PREFIX}/programs/${id}/progress`);
+      return res.data; // { success, data: { program, studentProgress } }
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
   },
 };
-
-

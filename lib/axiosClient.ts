@@ -50,7 +50,7 @@ axiosClient.interceptors.response.use(
       } catch (err) {
         localStorage.removeItem('authToken')
         localStorage.removeItem('refreshToken')
-        window.location.replace('/login')
+        window.location.replace('/auth/login')
         return Promise.reject(err)
       }
     }
