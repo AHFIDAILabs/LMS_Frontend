@@ -308,7 +308,7 @@ export const NewProgramGrid = ({
                         {program.estimatedHours && (
                           <div className="flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>{program.duration}</span>
+                            <span>{program.estimatedHours}</span>
                           </div>
                         )}
                         {program.enrollmentCount !== undefined && (
