@@ -392,10 +392,10 @@ export const CategoryLandingPage = ({ category }: CategoryLandingPageProps) => {
 
                           {/* Meta Info */}
                           <div className="flex items-center gap-4 text-xs text-gray-500 mb-4 mt-auto">
-                            {program.duration && (
+                            {program.estimatedHours && (
                               <div className="flex items-center gap-1">
                                 <Clock className="w-3.5 h-3.5" />
-                                <span>{program.duration}</span>
+                                <span>{program.estimatedHours}</span>
                               </div>
                             )}
                             {program.enrollmentCount !== undefined && (
