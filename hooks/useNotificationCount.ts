@@ -1,10 +1,8 @@
 "use client";
-
-// hooks/useNotificationCount.ts
-// Drop this in: src/hooks/useNotificationCount.ts
 // Used by all three sidebars to show live unread badge on the Bell nav item.
 
 import { useState, useEffect, useCallback } from "react";
+import { authService } from "@/services/authService";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
@@ -13,35 +11,32 @@ export function useNotificationCount() {
 
   const fetchCount = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token") ||
-        document.cookie.match(/token=([^;]+)/)?.[1];
+      // ✅ Use authService.getToken() — same source AuthContext uses
+      const token = authService.getToken();
+      if (!token) return; // Not logged in, don't bother fetching
 
-      const res = await fetch(`${API_URL}/notifications?page=1&limit=1&unreadOnly=true`, {
+      const res = await fetch(`${API_URL}/notifications?page=1&limit=1`, {
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
-        credentials: "include",
       });
 
       if (!res.ok) return;
+
       const data = await res.json();
 
-      // Backend returns { total, unreadCount, data } — use whichever field exists
-      const count =
-        data.unreadCount ??
-        data.total ??
-        (Array.isArray(data.data) ? data.data.length : 0);
-
-      setUnreadCount(count);
+      // ✅ Backend always returns unreadCount as a top-level field
+      // (confirmed in notification.controller.ts — it's always computed separately)
+      setUnreadCount(data.unreadCount ?? 0);
     } catch {
-      // Silently fail — count stays 0
+      // Silently fail — badge just won't show
     }
   }, []);
 
   useEffect(() => {
     void fetchCount();
-    // Refresh every 60 seconds
     const interval = setInterval(() => void fetchCount(), 60_000);
     return () => clearInterval(interval);
   }, [fetchCount]);

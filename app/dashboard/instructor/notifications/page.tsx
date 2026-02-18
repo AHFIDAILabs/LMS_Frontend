@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import InstructorSidebar from "@/components/dashboard/InstructorSide";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useNotificationCount } from "@/hooks/useNotificationCount";
+import { authService } from "@/services/authService";
 import {
   Bell, RefreshCw, Check, CheckCheck, Trash2,
   Search, BookOpen, FileText, Award,
@@ -35,8 +37,9 @@ function timeAgo(date: string) {
   return new Date(date).toLocaleDateString();
 }
 
+// ✅ Uses authService.getToken() — same as AuthContext and the hook
 async function apiFetch(path: string, opts: RequestInit = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = authService.getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...opts,
     credentials: "include",
@@ -52,6 +55,7 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
 export default function InstructorNotificationsPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { refetch: refetchBadge } = useNotificationCount();
 
   const [rows,        setRows]        = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -65,12 +69,15 @@ export default function InstructorNotificationsPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [notifRes, unreadRes] = await Promise.all([
-        apiFetch(`/notifications?page=${page}&limit=${limit}${unreadOnly ? "&unreadOnly=true" : ""}`),
-        apiFetch(`/notifications?page=1&limit=1&unreadOnly=true`),
-      ]);
-      if (notifRes.success) { setRows(notifRes.data || []); setTotal(notifRes.total || 0); }
-      if (unreadRes.success) setUnreadCount(unreadRes.total ?? 0);
+      const res = await apiFetch(
+        `/notifications?page=${page}&limit=${limit}${unreadOnly ? "&unreadOnly=true" : ""}`
+      );
+      if (res.success) {
+        setRows(res.data || []);
+        setTotal(res.total || 0);
+        // ✅ Backend always returns unreadCount on every response
+        setUnreadCount(res.unreadCount ?? 0);
+      }
     } finally {
       setLoading(false);
     }
@@ -84,17 +91,15 @@ export default function InstructorNotificationsPage() {
 
   const markRead = async (id: string) => {
     await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
-    void fetchAll();
+    void fetchAll(); void refetchBadge();
   };
-
   const markAllRead = async () => {
     await apiFetch("/notifications/read-all", { method: "PATCH" });
-    void fetchAll();
+    void fetchAll(); void refetchBadge();
   };
-
   const remove = async (id: string) => {
     await apiFetch(`/notifications/${id}`, { method: "DELETE" });
-    void fetchAll();
+    void fetchAll(); void refetchBadge();
   };
 
   const pages     = Math.max(1, Math.ceil(total / limit));
@@ -107,20 +112,12 @@ export default function InstructorNotificationsPage() {
       )
     : rows;
 
-  // Group visible notifications by today / yesterday / older
   const groups = filtered.reduce<Record<string, any[]>>((acc, n) => {
-    const d   = new Date(n.createdAt);
-    const now = new Date();
-    let bucket: string;
-
-    if (d.toDateString() === now.toDateString()) {
-      bucket = "Today";
-    } else {
-      const yesterday = new Date(now);
-      yesterday.setDate(now.getDate() - 1);
-      bucket = d.toDateString() === yesterday.toDateString() ? "Yesterday" : d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
-    }
-
+    const d = new Date(n.createdAt), now = new Date();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const bucket = d.toDateString() === now.toDateString() ? "Today"
+      : d.toDateString() === yesterday.toDateString() ? "Yesterday"
+      : d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
     acc[bucket] = acc[bucket] ?? [];
     acc[bucket].push(n);
     return acc;
@@ -167,11 +164,10 @@ export default function InstructorNotificationsPage() {
             </div>
           </div>
 
-          {/* ── Stats ── */}
           <div className="grid grid-cols-3 gap-4 mt-6">
             {[
-              { label: "Total",  value: total,       color: "text-white",       bg: "from-slate-800/60 to-slate-800/40",   border: "border-slate-700/50" },
-              { label: "Unread", value: unreadCount, color: "text-blue-400",    bg: "from-blue-900/20 to-blue-900/10",     border: "border-blue-500/30" },
+              { label: "Total",  value: total,       color: "text-white",       bg: "from-slate-800/60 to-slate-800/40",     border: "border-slate-700/50" },
+              { label: "Unread", value: unreadCount, color: "text-blue-400",    bg: "from-blue-900/20 to-blue-900/10",       border: "border-blue-500/30" },
               { label: "Read",   value: readCount,   color: "text-emerald-400", bg: "from-emerald-900/20 to-emerald-900/10", border: "border-emerald-500/30" },
             ].map(s => (
               <div key={s.label} className={`bg-gradient-to-br ${s.bg} border ${s.border} rounded-2xl p-4`}>
@@ -186,12 +182,8 @@ export default function InstructorNotificationsPage() {
         <div className="bg-slate-800/40 border border-gray-700/50 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search notifications…"
-              className="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all"
-            />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notifications…"
+              className="w-full pl-9 pr-9 py-2.5 bg-slate-900 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all" />
             {search && (
               <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
                 <X size={14} />
@@ -199,17 +191,12 @@ export default function InstructorNotificationsPage() {
             )}
           </div>
           <label className="flex items-center gap-2.5 px-4 py-2.5 bg-slate-900 border border-gray-700 rounded-xl cursor-pointer hover:border-blue-500/50 transition-all">
-            <input
-              type="checkbox"
-              checked={unreadOnly}
-              onChange={e => { setUnreadOnly(e.target.checked); setPage(1); }}
-              className="accent-blue-500 w-4 h-4"
-            />
+            <input type="checkbox" checked={unreadOnly} onChange={e => { setUnreadOnly(e.target.checked); setPage(1); }} className="accent-blue-500 w-4 h-4" />
             <span className="text-sm text-gray-300 whitespace-nowrap">Unread only</span>
           </label>
         </div>
 
-        {/* ── Notification list, grouped by day ── */}
+        {/* ── List ── */}
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -225,60 +212,40 @@ export default function InstructorNotificationsPage() {
           <div className="space-y-6">
             {Object.entries(groups).map(([dateLabel, items]) => (
               <div key={dateLabel}>
-                {/* Day separator */}
                 <div className="flex items-center gap-3 mb-3">
                   <div className="flex-1 h-px bg-gray-800" />
                   <span className="text-xs text-gray-600 font-semibold uppercase tracking-wider px-2">{dateLabel}</span>
                   <div className="flex-1 h-px bg-gray-800" />
                 </div>
-
                 <div className="bg-slate-800/40 border border-gray-700/50 rounded-2xl overflow-hidden">
                   <ul className="divide-y divide-gray-700/50">
                     {items.map(n => {
-                      const cfg  = getTypeConfig(n.type);
+                      const cfg = getTypeConfig(n.type);
                       const Icon = cfg.icon;
                       return (
-                        <li
-                          key={n._id}
-                          className={`group flex items-start gap-4 p-5 transition-all hover:bg-slate-800/60 ${
-                            !n.isRead ? "border-l-2 border-blue-500" : "border-l-2 border-transparent"
-                          }`}
-                        >
-                          {/* Type icon */}
+                        <li key={n._id} className={`group flex items-start gap-4 p-5 transition-all hover:bg-slate-800/60 ${!n.isRead ? "border-l-2 border-blue-500" : "border-l-2 border-transparent"}`}>
                           <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${cfg.bg}`}>
                             <Icon size={18} className={cfg.color} />
                           </div>
-
-                          {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                  <p className={`text-sm font-semibold leading-snug ${n.isRead ? "text-gray-300" : "text-white"}`}>
-                                    {n.title || "Notification"}
-                                  </p>
-                                  <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${cfg.bg} ${cfg.color}`}>
-                                    {cfg.label}
-                                  </span>
-                                  {!n.isRead && (
-                                    <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                                  )}
+                                  <p className={`text-sm font-semibold leading-snug ${n.isRead ? "text-gray-300" : "text-white"}`}>{n.title || "Notification"}</p>
+                                  <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                                  {!n.isRead && <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />}
                                 </div>
                                 <p className="text-sm text-gray-400 leading-relaxed">{n.message}</p>
                               </div>
                               <span className="text-xs text-gray-600 whitespace-nowrap shrink-0">{timeAgo(n.createdAt)}</span>
                             </div>
-
-                            {/* Actions */}
                             <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               {!n.isRead && (
-                                <button onClick={() => markRead(n._id)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-blue-600/20 border border-gray-600 hover:border-blue-500/50 rounded-lg text-xs text-gray-300 hover:text-blue-300 transition-all">
+                                <button onClick={() => markRead(n._id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-blue-600/20 border border-gray-600 hover:border-blue-500/50 rounded-lg text-xs text-gray-300 hover:text-blue-300 transition-all">
                                   <Check size={12} /> Mark read
                                 </button>
                               )}
-                              <button onClick={() => remove(n._id)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-red-600/20 border border-gray-600 hover:border-red-500/50 rounded-lg text-xs text-gray-300 hover:text-red-400 transition-all">
+                              <button onClick={() => remove(n._id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-red-600/20 border border-gray-600 hover:border-red-500/50 rounded-lg text-xs text-gray-300 hover:text-red-400 transition-all">
                                 <Trash2 size={12} /> Delete
                               </button>
                             </div>
@@ -293,19 +260,12 @@ export default function InstructorNotificationsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {pages > 1 && (
           <div className="mt-6 flex items-center justify-between text-sm text-gray-400 bg-slate-800/40 border border-gray-700/50 rounded-2xl px-5 py-4">
             <span>Page {page} of {pages} · {total} total</span>
             <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">
-                Prev
-              </button>
-              <button disabled={page === pages} onClick={() => setPage(p => Math.min(pages, p + 1))}
-                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">
-                Next
-              </button>
+              <button disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">Prev</button>
+              <button disabled={page === pages} onClick={() => setPage(p => Math.min(pages, p + 1))} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-40 transition-all">Next</button>
             </div>
           </div>
         )}

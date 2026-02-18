@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import InstructorSidebar from "@/components/dashboard/InstructorSide";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -9,7 +9,6 @@ import { InstructorStudent } from "@/types";
 import {
   Users,
   Search,
-  BookOpen,
   TrendingUp,
   Clock,
   CheckCircle,
@@ -25,6 +24,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+// ✅ small debounce hook to avoid spamming API while typing
+function useDebounced<T>(value: T, delay = 400) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function InstructorStudentsPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -36,6 +45,7 @@ export default function InstructorStudentsPage() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounced(searchQuery, 450); // ✅ use server-side search
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -50,23 +60,42 @@ export default function InstructorStudentsPage() {
     averageProgress: 0,
   });
 
+  // =========================================
+  // Auth gate
+  // =========================================
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated || user?.role !== "instructor") {
       router.push("/dashboard");
       return;
     }
-
+    // initial fetch
     fetchStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, user?.role]);
 
+  // =========================================
+  // Refetch on filters / page change
+  // =========================================
   useEffect(() => {
-    if (isAuthenticated && user?.role === "instructor") {
-      fetchStudents();
-    }
+    if (!isAuthenticated || user?.role !== "instructor") return;
+    setCurrentPage(1); // ✅ reset to page 1 when status changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, currentPage]);
+  }, [selectedStatus]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "instructor") return;
+    fetchStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // ✅ debounced server-side search
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "instructor") return;
+    setCurrentPage(1);
+    fetchStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   const fetchStudents = async () => {
     try {
@@ -78,26 +107,37 @@ export default function InstructorStudentsPage() {
         limit: itemsPerPage,
       };
 
-      if (selectedStatus !== "all") {
-        params.status = selectedStatus;
-      }
+      if (selectedStatus !== "all") params.status = selectedStatus;
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
 
-      console.log('Fetching students with params:', params);
       const response = await instructorService.getStudents(params);
-      console.log('Students response:', response);
 
-      if (response.success && response.data) {
-        // Remove duplicates based on _id
+      if (response?.success && Array.isArray(response.data)) {
         const uniqueStudents = removeDuplicates(response.data);
-        console.log(`Original: ${response.data.length}, Unique: ${uniqueStudents.length}`);
-        
         setStudents(uniqueStudents);
+
+        // Backend returns total/pages/page/count — support all shapes gracefully
         setTotalPages(response.pages || 1);
-        setTotalStudents(response.total || response.count || uniqueStudents.length);
+        setTotalStudents(
+          typeof response.total === "number"
+            ? response.total
+            : typeof response.count === "number"
+            ? response.count
+            : uniqueStudents.length
+        );
 
         calculateStats(uniqueStudents);
       } else {
-        setError(response.error || "Failed to fetch students");
+        setStudents([]);
+        setTotalPages(1);
+        setTotalStudents(0);
+        setStats({
+          totalStudents: 0,
+          activeStudents: 0,
+          completedStudents: 0,
+          averageProgress: 0,
+        });
+        setError(response?.error || "Failed to fetch students");
       }
     } catch (err: any) {
       console.error("Failed to fetch students:", err);
@@ -107,12 +147,15 @@ export default function InstructorStudentsPage() {
     }
   };
 
-  // Remove duplicate students based on _id
+  // Remove duplicate students based on _id (defensive)
   const removeDuplicates = (studentData: InstructorStudent[]) => {
     const seen = new Set<string>();
     return studentData.filter((student) => {
+      if (!student?._id) return false;
       if (seen.has(student._id)) {
-        console.warn(`Duplicate student found: ${student._id} - ${student.firstName} ${student.lastName}`);
+        console.warn(
+          `Duplicate student found: ${student._id} - ${student.firstName} ${student.lastName}`
+        );
         return false;
       }
       seen.add(student._id);
@@ -123,14 +166,12 @@ export default function InstructorStudentsPage() {
   const calculateStats = (studentData: InstructorStudent[]) => {
     const total = studentData.length;
     const active = studentData.filter((s) => s.status === "active").length;
-    const completed = studentData.filter(
-      (s) => s.status === "completed",
-    ).length;
+    const completed = studentData.filter((s) => s.status === "completed").length;
     const avgProgress =
       total > 0
         ? studentData.reduce(
             (sum, s) => sum + (s.progress?.overallProgress || 0),
-            0,
+            0
           ) / total
         : 0;
 
@@ -143,7 +184,10 @@ export default function InstructorStudentsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    if (!dateString) return "N/A";
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -170,51 +214,50 @@ export default function InstructorStudentsPage() {
     return "bg-red-500";
   };
 
-  const filteredStudents = students.filter((student) => {
-    const searchLower = searchQuery.toLowerCase();
-    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
-    const email = student.email?.toLowerCase() || "";
-    
-    // Search in all courses
-    const courseMatches = student.courses?.some(course => 
-      course.title?.toLowerCase().includes(searchLower)
-    ) || false;
-
-    return (
-      fullName.includes(searchLower) ||
-      email.includes(searchLower) ||
-      courseMatches
-    );
-  });
+  // ✅ We now rely on server-side filtering.
+  // Still allow client-side quick filtering if you want (toggle with useMemo):
+  const filteredStudents = useMemo(() => students, [students]);
 
   const handleExportCSV = () => {
+    if (!filteredStudents.length) return;
+
     const csvData = filteredStudents.map((student) => ({
-      Name: `${student.firstName} ${student.lastName}`,
-      Email: student.email,
-      Courses: student.courses?.map(c => c.title).join('; ') || "N/A",
+      Name: `${student.firstName ?? ""} ${student.lastName ?? ""}`.trim(),
+      Email: student.email ?? "",
+      Courses:
+        student.courses?.map((c: any) => c.title).join("; ") || "N/A",
       Status: student.status,
       Progress: `${student.progress?.overallProgress || 0}%`,
-      "Lessons Completed": `${student.progress?.completedLessons || 0}/${student.progress?.totalLessons || 0}`,
-      "Enrollment Date": formatDate(student.enrollmentDate),
+      "Lessons Completed": `${student.progress?.completedLessons || 0}/${
+        student.progress?.totalLessons || 0
+      }`,
+      "Enrollment Date": formatDate(String(student.enrollmentDate)),
       "Last Active": student.progress?.lastAccessedAt
-        ? formatDate(student.progress.lastAccessedAt)
+        ? formatDate(String(student.progress.lastAccessedAt))
         : "N/A",
       Cohort: student.studentProfile?.cohort || "N/A",
     }));
 
-    const csv = [
-      Object.keys(csvData[0]).join(","),
-      ...csvData.map((row) => Object.values(row).map(val => 
-        typeof val === 'string' && val.includes(',') ? `"${val}"` : val
-      ).join(",")),
-    ].join("\n");
+    const header = Object.keys(csvData[0]).join(",");
+    const rows = csvData
+      .map((row) =>
+        Object.values(row)
+          .map((val) => {
+            const v = String(val ?? "");
+            return v.includes(",") ? `"${v.replace(/"/g, '""')}"` : v;
+          })
+          .join(",")
+      )
+      .join("\n");
 
+    const csv = [header, rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `students-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (authLoading || loading) {
@@ -328,11 +371,15 @@ export default function InstructorStudentsPage() {
             className="lg:hidden w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-gray-700 transition-colors mb-4"
           >
             <Filter size={18} />
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
+            {showFilters ? "Hide Filters" : "Show Filters"}
           </button>
 
           {/* Filters */}
-          <div className={`bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-4 sm:p-6 mb-6 ${showFilters ? 'block' : 'hidden lg:block'}`}>
+          <div
+            className={`bg-slate-800/50 backdrop-blur rounded-xl border border-gray-700 p-4 sm:p-6 mb-6 ${
+              showFilters ? "block" : "hidden lg:block"
+            }`}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Search */}
               <div>
@@ -363,7 +410,7 @@ export default function InstructorStudentsPage() {
                   value={selectedStatus}
                   onChange={(e) => {
                     setSelectedStatus(e.target.value);
-                    setCurrentPage(1);
+                    // page reset handled by effect
                   }}
                   className="w-full px-4 py-2.5 bg-slate-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-emerald-400 transition-colors text-sm"
                 >
@@ -425,9 +472,9 @@ export default function InstructorStudentsPage() {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                              {student.firstName?.[0] || ""}
-                              {student.lastName?.[0] || ""}
+                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                              {(student.firstName?.[0] || "").toUpperCase()}
+                              {(student.lastName?.[0] || "").toUpperCase()}
                             </div>
                             <div className="min-w-0">
                               <p className="text-white font-medium text-sm truncate">
@@ -447,7 +494,7 @@ export default function InstructorStudentsPage() {
                             <div className="min-w-0 flex-1">
                               {student.courses && student.courses.length > 0 ? (
                                 <div className="space-y-1">
-                                  {student.courses.slice(0, 2).map((course, idx) => (
+                                  {student.courses.slice(0, 2).map((course: any, idx: number) => (
                                     <p key={`${course.id}-${idx}`} className="text-gray-300 text-xs truncate">
                                       {course.title}
                                     </p>
@@ -478,7 +525,9 @@ export default function InstructorStudentsPage() {
                             </div>
                             <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
                               <div
-                                className={`h-full transition-all ${getProgressColor(student.progress?.overallProgress || 0)}`}
+                                className={`h-full transition-all ${getProgressColor(
+                                  student.progress?.overallProgress || 0
+                                )}`}
                                 style={{
                                   width: `${student.progress?.overallProgress || 0}%`,
                                 }}
@@ -488,21 +537,27 @@ export default function InstructorStudentsPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${getStatusColor(student.status)}`}>
-                            {student.status?.charAt(0).toUpperCase() + student.status?.slice(1) || 'N/A'}
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${getStatusColor(
+                              student.status
+                            )}`}
+                          >
+                            {student.status
+                              ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
+                              : "N/A"}
                           </span>
                         </td>
 
                         <td className="px-4 py-3">
                           <span className="text-gray-300 text-sm">
-                            {student.studentProfile?.cohort || '-'}
+                            {student.studentProfile?.cohort || "-"}
                           </span>
                         </td>
 
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 text-gray-400 text-xs whitespace-nowrap">
                             <Calendar size={12} />
-                            {formatDate(student.enrollmentDate)}
+                            {formatDate(String(student.enrollmentDate))}
                           </div>
                         </td>
 
@@ -510,7 +565,7 @@ export default function InstructorStudentsPage() {
                           <div className="flex items-center gap-2 text-gray-400 text-xs whitespace-nowrap">
                             <Clock size={12} />
                             {student.progress?.lastAccessedAt
-                              ? formatDate(student.progress.lastAccessedAt)
+                              ? formatDate(String(student.progress.lastAccessedAt))
                               : "Never"}
                           </div>
                         </td>
@@ -535,11 +590,9 @@ export default function InstructorStudentsPage() {
                       <td colSpan={8} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <Users size={48} className="text-gray-600 mb-3" />
-                          <p className="text-gray-400 text-lg">
-                            No students found
-                          </p>
+                          <p className="text-gray-400 text-lg">No students found</p>
                           <p className="text-gray-500 text-sm mt-1">
-                            {searchQuery
+                            {debouncedSearch || selectedStatus !== "all"
                               ? "Try adjusting your search or filters"
                               : "Students will appear here when they enroll in your courses"}
                           </p>
@@ -558,9 +611,9 @@ export default function InstructorStudentsPage() {
                   <div key={`${student._id}-mobile-${index}`} className="p-4 hover:bg-slate-700/30 transition-colors">
                     {/* Student Info */}
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-semibold shrink-0">
-                        {student.firstName?.[0] || ""}
-                        {student.lastName?.[0] || ""}
+                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-semibold shrink-0">
+                        {(student.firstName?.[0] || "").toUpperCase()}
+                        {(student.lastName?.[0] || "").toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-white font-medium text-sm">
@@ -571,8 +624,14 @@ export default function InstructorStudentsPage() {
                           {student.email}
                         </p>
                         <div className="flex items-center gap-2 mt-2">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(student.status)}`}>
-                            {student.status?.charAt(0).toUpperCase() + student.status?.slice(1) || 'N/A'}
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(
+                              student.status
+                            )}`}
+                          >
+                            {student.status
+                              ? student.status.charAt(0).toUpperCase() + student.status.slice(1)
+                              : "N/A"}
                           </span>
                           {student.studentProfile?.cohort && (
                             <span className="text-gray-400 text-xs">
@@ -591,7 +650,7 @@ export default function InstructorStudentsPage() {
                       </div>
                       {student.courses && student.courses.length > 0 ? (
                         <div className="space-y-1 ml-5">
-                          {student.courses.map((course, idx) => (
+                          {student.courses.map((course: any, idx: number) => (
                             <p key={`${course.id}-mobile-${idx}`} className="text-gray-300 text-xs truncate">
                               • {course.title}
                             </p>
@@ -615,7 +674,9 @@ export default function InstructorStudentsPage() {
                       </div>
                       <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
                         <div
-                          className={`h-full transition-all ${getProgressColor(student.progress?.overallProgress || 0)}`}
+                          className={`h-full transition-all ${getProgressColor(
+                            student.progress?.overallProgress || 0
+                          )}`}
                           style={{
                             width: `${student.progress?.overallProgress || 0}%`,
                           }}
@@ -627,13 +688,13 @@ export default function InstructorStudentsPage() {
                     <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
                       <div className="flex items-center gap-1">
                         <Calendar size={11} />
-                        <span>Enrolled: {formatDate(student.enrollmentDate)}</span>
+                        <span>Enrolled: {formatDate(String(student.enrollmentDate))}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock size={11} />
                         <span>
                           {student.progress?.lastAccessedAt
-                            ? formatDate(student.progress.lastAccessedAt)
+                            ? formatDate(String(student.progress.lastAccessedAt))
                             : "Never"}
                         </span>
                       </div>
@@ -659,11 +720,9 @@ export default function InstructorStudentsPage() {
                 <div className="px-6 py-12 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <Users size={48} className="text-gray-600 mb-3" />
-                    <p className="text-gray-400 text-lg">
-                      No students found
-                    </p>
+                    <p className="text-gray-400 text-lg">No students found</p>
                     <p className="text-gray-500 text-sm mt-1">
-                      {searchQuery
+                      {debouncedSearch || selectedStatus !== "all"
                         ? "Try adjusting your search or filters"
                         : "Students will appear here when they enroll in your courses"}
                     </p>
@@ -677,14 +736,11 @@ export default function InstructorStudentsPage() {
               <div className="px-4 sm:px-6 py-4 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-xs sm:text-sm text-gray-400 text-center sm:text-left">
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                  {Math.min(currentPage * itemsPerPage, totalStudents)} of{" "}
-                  {totalStudents} students
+                  {Math.min(currentPage * itemsPerPage, totalStudents)} of {totalStudents} students
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(1, prev - 1))
-                    }
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
                     className="px-3 sm:px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                   >
@@ -719,9 +775,7 @@ export default function InstructorStudentsPage() {
                     })}
                   </div>
                   <button
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                    }
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 sm:px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                   >

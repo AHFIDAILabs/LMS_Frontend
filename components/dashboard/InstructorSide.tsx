@@ -89,15 +89,20 @@ function NavLink({ item, level = 0, unreadCount = 0 }: {
           active ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-800 hover:text-white'
         )}
       >
-        <item.icon className={clsx('shrink-0', level > 0 ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')} />
-        <span className="flex-1">{item.label}</span>
+        {/* Icon with badge overlay */}
+        <div className="relative shrink-0 w-5 h-5 flex items-center justify-center">
+          <item.icon className={clsx(level > 0 ? 'w-3.5 h-3.5' : 'w-[18px] h-[18px]')} />
+          {item.isNotification && unreadCount > 0 && (
+            <span
+              className="absolute -top-2 -right-2 min-w-[17px] h-[17px] px-[3px] rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none z-10"
+              style={{ boxShadow: '0 0 0 1.5px #020617' }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </div>
 
-        {/* ✅ Unread count badge */}
-        {item.isNotification && unreadCount > 0 && (
-          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        <span className="flex-1">{item.label}</span>
 
         {hasChildren && (
           <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', parentActive ? 'rotate-180' : '')} />
@@ -118,7 +123,7 @@ function NavLink({ item, level = 0, unreadCount = 0 }: {
 export default function InstructorSidebar({ sidebarOpen = false, closeSidebar }: SidebarProps) {
   const { user, logout } = useAuth();
   const [imageError, setImageError] = useState(false);
-  const { unreadCount } = useNotificationCount();  // ✅ live count
+  const { unreadCount } = useNotificationCount();
 
   const handleLogout = async () => { try { await logout(); } catch {} };
   const userInitials = `${(user?.firstName?.[0] || '').toUpperCase()}${(user?.lastName?.[0] || '').toUpperCase()}`;

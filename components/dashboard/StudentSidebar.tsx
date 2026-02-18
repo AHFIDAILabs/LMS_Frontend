@@ -77,15 +77,18 @@ function NavLink({ item, level = 0, unreadCount = 0 }: {
           active ? 'bg-lime-500/10 text-lime-400' : 'text-gray-400 hover:bg-slate-800 hover:text-white'
         )}
       >
-        <item.icon className={clsx('shrink-0', level > 0 ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')} />
-        <span className="flex-1">{item.label}</span>
+        {/* Icon wrapper — `relative` so the badge can anchor to it */}
+        <div className="relative shrink-0">
+          <item.icon className={clsx(level > 0 ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')} />
+          {/* ✅ Badge overlays the icon, matching the page-header bell style */}
+          {item.isNotification && unreadCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </div>
 
-        {/* ✅ Unread badge — only on notification item */}
-        {item.isNotification && unreadCount > 0 && (
-          <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        <span className="flex-1">{item.label}</span>
 
         {hasChildren && (
           <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', parentActive ? 'rotate-180' : '')} />

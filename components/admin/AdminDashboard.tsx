@@ -144,7 +144,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="p-4 space-y-2">
                   {[
-                    { href: '/dashboard/admin/programs', label: 'Manage Programs' }, // ← fixed typo
+                    { href: '/dashboard/admin/programes', label: 'Manage Programs' }, // ← fixed typo
                     { href: '/dashboard/admin/courses', label: 'Manage Courses' },
                     { href: '/dashboard/admin/instructors', label: 'Manage Instructors' },
                     { href: '/dashboard/admin/users', label: 'Manage Users' },
