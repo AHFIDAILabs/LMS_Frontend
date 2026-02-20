@@ -58,8 +58,10 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Reports',
     items: [
-      { label: 'Analytics',   href: '/dashboard/instructor/analytics',  icon: BarChart3 },
-      { label: 'Submissions', href: '/dashboard/instructor/submission', icon: FileText },
+      { label: 'Analytics',    href: '/dashboard/instructor/analytics',    icon: BarChart3 },
+      // ✅ FIXED: Submissions are per-assessment, not a standalone nav item.
+      // Link to the assessments list — instructors pick an assessment there to view its submissions.
+      { label: 'Assessments',  href: '/dashboard/instructor/assessments',  icon: FileText },
     ],
   },
   {
@@ -89,7 +91,6 @@ function NavLink({ item, level = 0, unreadCount = 0 }: {
           active ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-800 hover:text-white'
         )}
       >
-        {/* Icon with badge overlay */}
         <div className="relative shrink-0 w-5 h-5 flex items-center justify-center">
           <item.icon className={clsx(level > 0 ? 'w-3.5 h-3.5' : 'w-[18px] h-[18px]')} />
           {item.isNotification && unreadCount > 0 && (
@@ -176,7 +177,7 @@ export default function InstructorSidebar({ sidebarOpen = false, closeSidebar }:
       </nav>
 
       <div className="border-t border-gray-800">
-        <div className="flex items-center gap-3 p-4">
+        <Link href="/profile" className="flex items-center gap-3 p-4">
           <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-300 shrink-0 overflow-hidden">
             {shouldShowImage ? (
               <Image src={validImageUrl!} alt="" width={36} height={36} className="w-full h-full object-cover" onError={() => setImageError(true)} unoptimized />
@@ -188,7 +189,7 @@ export default function InstructorSidebar({ sidebarOpen = false, closeSidebar }:
             <p className="text-sm font-medium text-white truncate">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
-        </div>
+        </Link>
         <div className="px-3 pb-3">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-slate-800 hover:text-red-400 transition-all">
             <LogOut className="w-4.5 h-4.5" />

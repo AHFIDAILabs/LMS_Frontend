@@ -17,7 +17,7 @@ import Link from "next/link";
 export default function ViewAssessmentPage() {
   const router = useRouter();
   const params = useParams();
-  const assessmentId = params.id as string;
+const assessmentId = params.assessmentId as string;
   const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   const [assessment, setAssessment] = useState<any>(null);

@@ -1,261 +1,287 @@
+'use client'
+
 import { motion } from 'framer-motion'
-import { ArrowRight, Zap, Users, Briefcase, Clock } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Zap, Users, Briefcase, BookOpen, Layers } from 'lucide-react'
 import { usePrograms } from '@/hooks/useProgram'
 import { Program } from '@/types'
+import { useMemo } from 'react'
 
 interface CategoryGridProps {
   title?: string
   subtitle?: string
 }
 
-// ⚠️  All three maps MUST use the exact same keys.
-// Keys are derived from program.category via: .toLowerCase().replace(/\s+/g, '-')
-// e.g. "Bootcamp" → "bootcamp" | "Fellowship" → "fellowship" | "AI Program" → "ai-program"
-// To debug: console.log(programs.map(p => p.category)) and align the keys below.
+// ── Category config ──────────────────────────────────────────────────────────
 const CATEGORY_COVER_IMAGES: Record<string, string> = {
   bootcamp:
-    'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750',
+    'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800&h=500',
   fellowship:
-    'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750',
+    'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800&h=500',
   'ai-program':
-    'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750',
+    'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=800&h=500',
 }
 
 const FALLBACK_COVER =
-  'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750'
+  'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800&h=500'
 
-// ✅ All three maps now share identical keys
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  bootcamp: Zap,
-  fellowship: Users,
+  bootcamp:     Zap,
+  fellowship:   Users,
   'ai-program': Briefcase,
 }
 
-const CATEGORY_ACCENTS: Record<string, 'lime' | 'emerald' | 'yellow'> = {
-  bootcamp: 'lime',
-  fellowship: 'emerald',
-  'ai-program': 'yellow',
+type Accent = 'lime' | 'emerald' | 'amber'
+
+const CATEGORY_ACCENTS: Record<string, Accent> = {
+  bootcamp:     'lime',
+  fellowship:   'emerald',
+  'ai-program': 'amber',
 }
 
-const accentStyles = {
+const ACCENTS: Record<Accent, {
+  bar: string; text: string; badge: string; badgeText: string;
+  iconBg: string; glow: string; ctaHover: string
+}> = {
   lime: {
-    border: 'border-lime-500/20 hover:border-lime-500/40',
-    bg: 'bg-lime-500/5 hover:bg-lime-500/10',
-    text: 'text-lime-400',
-    gradient: 'from-lime-400 to-lime-500',
-    dot: 'bg-lime-400',
-    ctaBg: 'bg-lime-500/10 group-hover:bg-lime-500/20',
+    bar:       'bg-lime-400',
+    text:      'text-lime-400',
+    badge:     'bg-lime-400/10 border-lime-400/20',
+    badgeText: 'text-lime-400',
+    iconBg:    'bg-lime-400/10',
+    glow:      'group-hover:shadow-lime-500/10',
+    ctaHover:  'group-hover:text-lime-400',
   },
   emerald: {
-    border: 'border-emerald-500/20 hover:border-emerald-500/40',
-    bg: 'bg-emerald-500/5 hover:bg-emerald-500/10',
-    text: 'text-emerald-400',
-    gradient: 'from-emerald-400 to-emerald-500',
-    dot: 'bg-emerald-400',
-    ctaBg: 'bg-emerald-500/10 group-hover:bg-emerald-500/20',
+    bar:       'bg-emerald-400',
+    text:      'text-emerald-400',
+    badge:     'bg-emerald-400/10 border-emerald-400/20',
+    badgeText: 'text-emerald-400',
+    iconBg:    'bg-emerald-400/10',
+    glow:      'group-hover:shadow-emerald-500/10',
+    ctaHover:  'group-hover:text-emerald-400',
   },
-  yellow: {
-    border: 'border-yellow-500/20 hover:border-yellow-500/40',
-    bg: 'bg-yellow-500/5 hover:bg-yellow-500/10',
-    text: 'text-yellow-400',
-    gradient: 'from-yellow-400 to-yellow-500',
-    dot: 'bg-yellow-400',
-    ctaBg: 'bg-yellow-500/10 group-hover:bg-yellow-500/20',
+  amber: {
+    bar:       'bg-amber-400',
+    text:      'text-amber-400',
+    badge:     'bg-amber-400/10 border-amber-400/20',
+    badgeText: 'text-amber-400',
+    iconBg:    'bg-amber-400/10',
+    glow:      'group-hover:shadow-amber-500/10',
+    ctaHover:  'group-hover:text-amber-400',
   },
 }
 
+// ── Resolvers ────────────────────────────────────────────────────────────────
+function categoryKey(program: Program): string {
+  return program.category?.toLowerCase().replace(/\s+/g, '-') ?? ''
+}
+function coverImage(program: Program): string {
+  if ((program as any).coverImage) return (program as any).coverImage
+  return CATEGORY_COVER_IMAGES[categoryKey(program)] ?? FALLBACK_COVER
+}
+function accent(program: Program): Accent {
+  return CATEGORY_ACCENTS[categoryKey(program)] ?? 'lime'
+}
+function icon(program: Program): React.ElementType {
+  return CATEGORY_ICONS[categoryKey(program)] ?? Briefcase
+}
+
+// ── Skeleton ─────────────────────────────────────────────────────────────────
 const SkeletonCard = () => (
-  <div className="rounded-2xl border border-white/5 bg-white/5 overflow-hidden min-h-[600px] animate-pulse">
-    <div className="h-64 bg-slate-800" />
-    <div className="p-8 space-y-4">
-      <div className="h-8 w-1/2 bg-slate-800 rounded" />
-      <div className="h-4 w-full bg-slate-800 rounded" />
-      <div className="h-4 w-5/6 bg-slate-800 rounded" />
-      <div className="space-y-2 mt-6">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-3 w-3/4 bg-slate-800 rounded" />
-        ))}
-      </div>
+  <div className="rounded-2xl border border-white/5 bg-slate-900/60 overflow-hidden animate-pulse">
+    <div className="h-40 bg-slate-800" />
+    <div className="p-5 space-y-3">
+      <div className="h-4 w-16 bg-slate-800 rounded-full" />
+      <div className="h-5 w-3/4 bg-slate-800 rounded" />
+      <div className="h-3 w-full bg-slate-800 rounded" />
+      <div className="h-3 w-5/6 bg-slate-800 rounded" />
     </div>
   </div>
 )
 
-// Single source of truth for key derivation — used by all three resolvers
-function resolveCategoryKey(program: Program): string {
-  return program.category?.toLowerCase().replace(/\s+/g, '-') ?? ''
+// ── Program card ─────────────────────────────────────────────────────────────
+function ProgramCard({ program, index }: { program: Program; index: number }) {
+  const ac    = accent(program)
+  const style = ACCENTS[ac]
+  const Icon  = icon(program)
+  const img   = coverImage(program)
+
+  const coursesCount  = Array.isArray(program.courses) ? program.courses.length : 0
+  const level         = Array.isArray(program.level) ? program.level[0] : program.level
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.45, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <a href={`/programs/${program.slug ?? program._id}`} className="block h-full">
+        <div className={`
+          group relative overflow-hidden rounded-2xl border border-white/8
+          bg-slate-900/70 backdrop-blur-sm
+          transition-all duration-300 ease-out
+          hover:-translate-y-1 hover:border-white/14
+          hover:shadow-2xl ${style.glow}
+          flex flex-col h-full
+        `}>
+
+          {/* Accent bar — top edge */}
+          <div className={`absolute top-0 left-0 right-0 h-[2px] ${style.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
+
+          {/* Image — compact height */}
+          <div className="relative h-40 overflow-hidden shrink-0">
+            <img
+              src={img}
+              alt={program.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
+
+            {/* Category badge — bottom left of image */}
+            {program.category && (
+              <div className={`absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${style.badge} ${style.badgeText} backdrop-blur-md`}>
+                <Icon className="w-3 h-3" />
+                {program.category}
+              </div>
+            )}
+
+            {/* Ext link icon top-right */}
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <div className="p-1.5 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10">
+                <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-5 flex flex-col flex-1">
+
+            {/* Title */}
+            <h3 className={`text-base font-bold text-white leading-snug mb-2 transition-colors duration-200 ${style.ctaHover}`}>
+              {program.title}
+            </h3>
+
+            {/* Description */}
+            <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 mb-4">
+              {program.description}
+            </p>
+
+            {/* Meta row */}
+            <div className="flex items-center gap-3 mt-auto pt-3 border-t border-white/6">
+              {coursesCount > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <BookOpen className="w-3 h-3" />
+                  <span>{coursesCount} course{coursesCount !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              {level && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Layers className="w-3 h-3" />
+                  <span className="capitalize">{level}</span>
+                </div>
+              )}
+              <div className={`ml-auto flex items-center gap-1 text-xs font-semibold ${style.text} transition-transform duration-200 group-hover:translate-x-0.5`}>
+                Explore
+                <ArrowRight className="w-3 h-3" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </a>
+    </motion.div>
+  )
 }
 
-function resolveCoverImage(program: Program): string {
-  if ((program as any).coverImage) return (program as any).coverImage
-  const key = resolveCategoryKey(program)
-  return CATEGORY_COVER_IMAGES[key] ?? FALLBACK_COVER
-}
-
-function resolveAccent(program: Program): 'lime' | 'emerald' | 'yellow' {
-  const key = resolveCategoryKey(program)
-  return CATEGORY_ACCENTS[key] ?? 'lime'
-}
-
-function resolveIcon(program: Program): React.ElementType {
-  const key = resolveCategoryKey(program)
-  return CATEGORY_ICONS[key] ?? Briefcase
-}
-
+// ── Main component ────────────────────────────────────────────────────────────
 export const CategoryGrid = ({
   title = 'Explore Our Programs',
   subtitle = 'Choose the learning path that fits your career goals',
 }: CategoryGridProps) => {
-  const { programs, loading, error } = usePrograms({ isPublished: true })
+  const params   = useMemo(() => ({ isPublished: true }), [])
+  const { programs, loading, error } = usePrograms(params)
 
   return (
-    <section className="py-24 px-4 bg-slate-950">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
+    <section className="relative py-24 px-4 bg-slate-950 overflow-hidden">
+      {/* Ambient background blobs */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-lime-500/4 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/4 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-6xl mx-auto relative z-10">
+
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="text-center mb-14">
+          {/* Eyebrow */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-lime-500/20 bg-lime-500/5 text-lime-400 text-xs font-semibold uppercase tracking-widest mb-5"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-lime-400 animate-pulse" />
+            Learning Paths
+          </motion.div>
+
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.05 }}
+            className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-4"
           >
             {title}
           </motion.h2>
+
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-xl text-gray-400 max-w-3xl mx-auto"
+            className="text-base text-gray-400 max-w-xl mx-auto leading-relaxed"
           >
             {subtitle}
           </motion.p>
         </div>
 
-        {/* Error state */}
+        {/* ── Error ──────────────────────────────────────────────────────── */}
         {error && (
-          <div className="text-center py-12">
-            <p className="text-red-400 text-lg">{error}</p>
+          <div className="text-center py-10">
+            <p className="text-red-400 text-sm">{error}</p>
           </div>
         )}
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* ── Grid ───────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {loading
             ? [1, 2, 3].map((i) => <SkeletonCard key={i} />)
-            : programs.map((program, index) => {
-                const coverImage = resolveCoverImage(program)
-                const accentColor = resolveAccent(program)
-                const Icon = resolveIcon(program)
-                const styles = accentStyles[accentColor]
-
-                const features: string[] =
-                  (program as any).features ??
-                  (program as any).highlights ??
-                  []
-
-                return (
-                  <motion.div
-                    key={program._id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.15 }}
-                  >
-                    <a href={`/programs/${program.slug ?? program._id}`} className="block h-full">
-                      <div
-                        className={`
-                          group relative overflow-hidden rounded-2xl border backdrop-blur-sm
-                          ${styles.border} ${styles.bg}
-                          transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl
-                          cursor-pointer h-full flex flex-col min-h-[600px]
-                        `}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                        <div className="relative h-64 overflow-hidden bg-slate-900">
-                          <img
-                            src={coverImage}
-                            alt={program.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                          <div className="absolute top-6 left-6 p-4 rounded-xl backdrop-blur-sm bg-slate-900/80 border border-white/10">
-                            <Icon className={`w-8 h-8 ${styles.text}`} />
-                          </div>
-                        </div>
-
-                        <div className="relative p-8 flex-1 flex flex-col">
-                          <h3
-                            className={`text-3xl font-bold text-white mb-3 group-hover:${styles.text} transition-colors`}
-                          >
-                            {program.title}
-                          </h3>
-
-                          <p className="text-gray-400 mb-6 leading-relaxed line-clamp-3">
-                            {program.description}
-                          </p>
-
-                          {features.length > 0 && (
-                            <div className="space-y-2 mb-6">
-                              {features.slice(0, 4).map((feature: string, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-2 text-sm text-gray-300"
-                                >
-                                  <div className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
-                                  {feature}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {(program as any).duration && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-4">
-                              <Clock className="w-3 h-3" />
-                              <span>{(program as any).duration}</span>
-                            </div>
-                          )}
-
-                          <div className="mt-auto">
-                            <div
-                              className={`flex items-center justify-between p-4 rounded-lg ${styles.ctaBg} transition-all duration-300`}
-                            >
-                              <span className={`font-bold ${styles.text}`}>
-                                Explore Programs
-                              </span>
-                              <ArrowRight
-                                className={`w-5 h-5 ${styles.text} group-hover:translate-x-1 transition-transform duration-300`}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </a>
-                  </motion.div>
-                )
-              })}
+            : programs.map((program, index) => (
+                <ProgramCard key={program._id} program={program} index={index} />
+              ))}
         </div>
 
+        {/* ── Empty ──────────────────────────────────────────────────────── */}
         {!loading && !error && programs.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-gray-500 text-lg">No programs available at the moment.</p>
+            <p className="text-gray-500 text-sm">No programs available at the moment.</p>
           </div>
         )}
 
+        {/* ── Footer CTA ─────────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mt-16"
+          transition={{ delay: 0.15 }}
+          className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <p className="text-gray-400 mb-6">
-            Not sure which path to take? We can help you decide.
-          </p>
+          <p className="text-gray-500 text-sm">Not sure which path to take?</p>
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-lime-400 to-emerald-500 text-slate-900 font-bold rounded-lg hover:from-lime-500 hover:to-emerald-600 transition-all duration-300 shadow-lg shadow-lime-500/20 text-lg hover:shadow-xl hover:shadow-lime-500/30"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-lime-400 to-emerald-500 text-slate-900 text-sm font-bold rounded-xl hover:from-lime-500 hover:to-emerald-600 transition-all duration-300 shadow-lg shadow-lime-500/20 hover:shadow-lime-500/30 hover:-translate-y-0.5"
           >
             Talk to an Advisor
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-4 h-4" />
           </a>
         </motion.div>
       </div>

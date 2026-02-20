@@ -420,6 +420,13 @@ export default function InstructorAssessmentsPage() {
                           <Edit size={14} />
                           Edit
                         </Link>
+                        <Link
+  href={`/dashboard/instructor/assessments/${assessment._id}/submissions`}
+  className="flex items-center gap-1 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm transition-colors"
+>
+  <Users size={14} />
+  Submissions
+</Link>
 
                         <button
                           onClick={() => handleTogglePublish(assessment._id)}

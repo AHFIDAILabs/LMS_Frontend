@@ -32,7 +32,7 @@ export const assessmentService = {
    * Backend route: getAssessmentById
    * Endpoint: GET /assessments/:id
    */
-  getById: async (assessmentId: string): Promise<ApiResponse<any>> => {
+  getById: async (assessmentId: string | undefined): Promise<ApiResponse<any>> => {
     const response = await fetchWithAuth(`${API_URL}/assessments/${assessmentId}`);
     return handleResponse(response) as Promise<ApiResponse<any>>;
   },
@@ -124,7 +124,7 @@ export const assessmentService = {
      * Backend route: deleteAssessment
      * Endpoint: DELETE /assessments/admin/:id
      */
-    delete: async (assessmentId: string): Promise<ApiResponse<{ message: string }>> => {
+    delete: async (assessmentId: string | undefined): Promise<ApiResponse<{ message: string }>> => {
       const response = await fetchWithAuth(`${API_URL}/assessments/admin/${assessmentId}`, {
         method: 'DELETE',
       });
@@ -136,7 +136,7 @@ export const assessmentService = {
      * Backend route: toggleAssessmentPublish
      * Endpoint: PATCH /assessments/admin/:id/publish
      */
-    togglePublish: async (assessmentId: string): Promise<ApiResponse<any>> => {
+    togglePublish: async (assessmentId: string | undefined): Promise<ApiResponse<any>> => {
       const response = await fetchWithAuth(`${API_URL}/assessments/admin/${assessmentId}/publish`, {
         method: 'PATCH',
       });
@@ -148,7 +148,7 @@ export const assessmentService = {
      * Backend route: reorderAssessments
      * Endpoint: PATCH /assessments/admin/reorder
      */
-    reorder: async (orders: Array<{ assessmentId: string; order: number }>): Promise<ApiResponse<{ message: string }>> => {
+    reorder: async (orders: Array<{ assessmentId: string | undefined; order: number }>): Promise<ApiResponse<{ message: string }>> => {
       const response = await fetchWithAuth(`${API_URL}/assessments/admin/reorder`, {
         method: 'PATCH',
         body: JSON.stringify({ orders }),
@@ -161,7 +161,7 @@ export const assessmentService = {
      * Backend route: sendAssessmentReminder
      * Endpoint: POST /assessments/admin/:assessmentId/reminder
      */
-    sendReminder: async (assessmentId: string): Promise<ApiResponse<{ message: string; count: number }>> => {
+    sendReminder: async (assessmentId: string | undefined): Promise<ApiResponse<{ message: string; count: number }>> => {
       const response = await fetchWithAuth(`${API_URL}/assessments/admin/${assessmentId}/reminder`, {
         method: 'POST',
       });

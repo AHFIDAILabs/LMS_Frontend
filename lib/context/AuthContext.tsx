@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { authService } from '@/services/authService'
-import { User, RegisterData } from '@/types/user'
+import { User, RegisterData } from '@/types'
 
 interface AuthContextType {
   user: User | null

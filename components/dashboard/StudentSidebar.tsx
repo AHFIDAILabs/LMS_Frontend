@@ -160,7 +160,7 @@ export default function StudentSidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-800">
-        <div className="flex items-center gap-3 p-4">
+        <Link href="/profile" className="flex items-center gap-3 p-4">
           <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-gray-300 shrink-0 overflow-hidden">
             {shouldShowImage ? (
               <Image src={validImageUrl!} alt="" width={32} height={32} className="w-full h-full object-cover" onError={() => setImageError(true)} unoptimized />
@@ -172,9 +172,9 @@ export default function StudentSidebar() {
             <p className="text-sm font-medium text-white truncate">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
-        </div>
+        </Link>
 
-        <div className="px-4 pb-3">
+        {/* <div className="px-4 pb-3">
           <div className="bg-slate-800/50 rounded-lg p-3">
             <div className="flex justify-between text-xs mb-2">
               <span className="text-gray-500">Storage used</span>
@@ -184,7 +184,7 @@ export default function StudentSidebar() {
               <div className="h-full w-[12%] bg-lime-500 rounded-full" />
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="px-3 pb-3">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-slate-800 hover:text-red-400 transition-all">

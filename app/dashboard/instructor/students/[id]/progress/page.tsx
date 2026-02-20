@@ -497,8 +497,8 @@ export default function StudentProgressPage({
               {activeTab === "assessments" && (
                 <div className="space-y-4">
                   {assessments && assessments.length > 0 ? (
-                    assessments.map((assessment) => (
-                      <div key={assessment._id} className="bg-slate-700/30 rounded-lg p-4">
+                    assessments.map((assessment, index) => (
+                      <div  key={`${assessment._id}-${index}`} className="bg-slate-700/30 rounded-lg p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                           <div className="min-w-0 flex-1">
                             <h3 className="text-white font-bold flex items-center gap-2">

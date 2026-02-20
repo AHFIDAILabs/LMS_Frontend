@@ -1,252 +1,224 @@
+// ============================================
 // services/submissionService.ts
+// Single source of truth for all submission operations.
+// Student-facing endpoints: /submissions/...
+// Instructor-facing endpoints: /instructors/submissions/... or /instructors/assessments/...
 // ============================================
 
-import { axiosClient } from '@/lib/axiosClient';
-import { ApiResponse } from '@/types';
+import { axiosClient } from '@/lib/axiosClient'
+import { ApiResponse } from '@/types'
+
+const extractError = (err: any): string => {
+  const data = err?.response?.data
+  if (!data) return err.message || 'Request failed'
+  if (data.error) return data.error
+  if (data.message) return data.message
+  if (data.errors) {
+    if (Array.isArray(data.errors) && data.errors[0]?.msg) return data.errors[0].msg
+    if (typeof data.errors === 'object') {
+      const first = Object.values(data.errors)[0]
+      if (Array.isArray(first) && first[0]) return first[0] as string
+    }
+  }
+  return 'Something went wrong'
+}
 
 export interface SubmissionPayload {
-  assessmentId: string;
-  answers: Array<{
-    questionId: string;
-    answer: string | string[];
-  }>;
-  courseId?: string;
-  programId?: string;
-  attachments?: string[];
+  assessmentId: string
+  answers: Array<{ questionId: string; answer: string | string[] }>
+  courseId?: string
+  programId?: string
+  attachments?: string[]
 }
 
 export interface GradeSubmissionPayload {
-  score: number;
-  feedback?: string;
+  score: number
+  feedback?: string
 }
 
 export const submissionService = {
   // =====================================================
-  // CREATE SUBMISSION
+  // STUDENT — create / view own submissions
   // =====================================================
 
-  /**
-   * Submit an assignment/assessment
-   */
+  /** Submit an assessment */
   createSubmission: async (data: SubmissionPayload): Promise<ApiResponse<any>> => {
     try {
-      const response = await axiosClient.post('/submissions', data);
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to submit assignment',
-        data: null as any,
-      };
+      const res = await axiosClient.post('/submissions', data)
+      return { success: true, data: res.data.data, message: res.data.message, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null }
     }
   },
 
-  /**
-   * Upload file(s) for a submission (multipart/form-data)
-   */
+  /** Upload a file attachment for a submission */
   uploadSubmissionFile: async (file: File): Promise<ApiResponse<{ url: string }>> => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await axiosClient.post('/submissions/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      return {
-        success: true,
-        data: response.data.data,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to upload file',
-        data: null as any,
-      };
+      const form = new FormData()
+      form.append('file', file)
+      const res = await axiosClient.post('/submissions/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return { success: true, data: res.data.data, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null as any }
     }
   },
 
-  // =====================================================
-  // GET SUBMISSIONS
-  // =====================================================
-
-  /**
-   * Get a single submission by ID
-   */
-  getSubmission: async (submissionId: string): Promise<ApiResponse<any>> => {
-    try {
-      const response = await axiosClient.get(`/submissions/${submissionId}`);
-      return {
-        success: true,
-        data: response.data.data,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to fetch submission',
-        data: null as any,
-      };
-    }
-  },
-
-  /**
-   * Get my submissions for a specific assessment
-   */
+  /** Get the logged-in student's own submissions for an assessment */
   getMySubmissions: async (assessmentId: string): Promise<ApiResponse<any[]>> => {
     try {
-      const response = await axiosClient.get(`/submissions/assessment/${assessmentId}/my-submissions`);
-      return {
-        success: true,
-        data: response.data.data,
-        count: response.data.count,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to fetch your submissions',
-        data: [],
-      };
+      const res = await axiosClient.get(
+        `/submissions/assessment/${assessmentId}/my-submissions`
+      )
+      return { success: true, data: res.data.data, count: res.data.count, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: [] }
     }
   },
 
+  /** Update a submission before it has been graded */
+  updateSubmission: async (
+    submissionId: string,
+    data: Partial<SubmissionPayload>
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.patch(`/submissions/${submissionId}`, data)
+      return { success: true, data: res.data.data, message: res.data.message, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null }
+    }
+  },
+
+  /** Delete a submission before it has been graded */
+  deleteSubmission: async (submissionId: string): Promise<ApiResponse<null>> => {
+    try {
+      const res = await axiosClient.delete(`/submissions/${submissionId}`)
+      return { success: true, data: null, message: res.data.message, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null }
+    }
+  },
+
+  // =====================================================
+  // INSTRUCTOR — view & grade submissions
+  // =====================================================
+
   /**
-   * Get submissions by assessment (for instructors/admins)
+   * All submissions for a specific assessment (instructor).
+   * Used by: AssessmentSubmissionsPage
+   * GET /api/v1/instructors/assessments/:assessmentId/submissions
    */
   getSubmissionsByAssessment: async (
     assessmentId: string,
     params?: { page?: number; limit?: number; status?: string }
   ): Promise<ApiResponse<any[]>> => {
     try {
-      const response = await axiosClient.get(`/submissions/assessment/${assessmentId}`, { params });
+      // Strip empty/undefined values
+      const cleanParams: Record<string, any> = {}
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          if (v !== undefined && v !== null && v !== '') cleanParams[k] = v
+        }
+      }
+      const res = await axiosClient.get(
+        `/instructors/assessments/${assessmentId}/submissions`,
+        { params: cleanParams }
+      )
       return {
         success: true,
-        data: response.data.data,
-        count: response.data.count,
-        total: response.data.total,
-        page: response.data.page,
-        pages: response.data.pages,
+        data: res.data.data,
+        count: res.data.count,
+        total: res.data.total,
+        page: res.data.page,
+        pages: res.data.pages,
         error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to fetch submissions',
-        data: [],
-      };
+      }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: [] }
     }
   },
 
   /**
-   * Get submissions by student (for instructors/admins)
+   * Single submission with student + assessment (incl. questions) populated.
+   * Used by: SubmissionDetailPage
+   * GET /api/v1/instructors/submissions/:submissionId
+   */
+  getSubmission: async (submissionId: string): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.get(`/submissions/${submissionId}`)
+      return { success: true, data: res.data.data, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null }
+    }
+  },
+
+  /**
+   * Grade a submission.
+   * Used by: SubmissionDetailPage  →  gradeSubmission(id, { score, feedback })
+   * PUT /api/v1/instructors/submissions/:submissionId/grade
+   */
+  gradeSubmission: async (
+    submissionId: string,
+    payload: GradeSubmissionPayload
+  ): Promise<ApiResponse<any>> => {
+    try {
+      const res = await axiosClient.put(
+        `/submissions/${submissionId}/grade`,
+        payload
+      )
+      return { success: true, data: res.data.data, message: res.data.message, error: undefined }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: null }
+    }
+  },
+
+  /**
+   * All submissions for a specific student (instructor/admin view).
+   * GET /api/v1/instructors/submissions/student/:studentId  (or your existing route)
    */
   getSubmissionsByStudent: async (
     studentId: string,
     params?: { page?: number; limit?: number; courseId?: string }
   ): Promise<ApiResponse<any[]>> => {
     try {
-      const response = await axiosClient.get(`/submissions/student/${studentId}`, { params });
+      const res = await axiosClient.get(`/submissions/student/${studentId}`, { params })
       return {
         success: true,
-        data: response.data.data,
-        count: response.data.count,
-        total: response.data.total,
-        page: response.data.page,
-        pages: response.data.pages,
+        data: res.data.data,
+        count: res.data.count,
+        total: res.data.total,
+        page: res.data.page,
+        pages: res.data.pages,
         error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to fetch student submissions',
-        data: [],
-      };
-    }
-  },
-
-  // =====================================================
-  // GRADE SUBMISSION (Instructor/Admin)
-  // =====================================================
-
-  /**
-   * Grade a submission
-   */
-  gradeSubmission: async (
-    submissionId: string,
-    data: GradeSubmissionPayload
-  ): Promise<ApiResponse<any>> => {
-    try {
-      const response = await axiosClient.patch(`/submissions/${submissionId}/grade`, data);
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to grade submission',
-        data: null as any,
-      };
-    }
-  },
-
-  // =====================================================
-  // UPDATE/DELETE SUBMISSION
-  // =====================================================
-
-  /**
-   * Update a submission (before grading)
-   */
-  updateSubmission: async (
-    submissionId: string,
-    data: Partial<SubmissionPayload>
-  ): Promise<ApiResponse<any>> => {
-    try {
-      const response = await axiosClient.patch(`/submissions/${submissionId}`, data);
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message,
-        error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to update submission',
-        data: null as any,
-      };
+      }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: [] }
     }
   },
 
   /**
-   * Delete a submission (before grading)
+   * All pending submissions across all instructor courses.
+   * GET /api/v1/instructors/submissions/pending
    */
-  deleteSubmission: async (submissionId: string): Promise<ApiResponse<null>> => {
+  getPendingSubmissions: async (params?: {
+    courseId?: string
+    page?: number
+    limit?: number
+  }): Promise<ApiResponse<any[]>> => {
     try {
-      const response = await axiosClient.delete(`/submissions/${submissionId}`);
+      const res = await axiosClient.get('/instructors/submissions/pending', { params })
       return {
         success: true,
-        data: null,
-        message: response.data.message,
+        data: res.data.data,
+        count: res.data.count,
+        total: res.data.total,
+        page: res.data.page,
+        pages: res.data.pages,
         error: undefined,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || error.message || 'Failed to delete submission',
-        data: null,
-      };
+      }
+    } catch (err: any) {
+      return { success: false, error: extractError(err), data: [] }
     }
   },
-};
+}

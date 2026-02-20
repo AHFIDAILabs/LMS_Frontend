@@ -82,10 +82,10 @@ export default function HomePage() {
       <ProcessSection />
 
       {/* Platform Statistics */}
-      <StatsSection />
+      {/* <StatsSection /> */}
 
       {/* Featured Instructors */}
-      <InstructorsSection instructors={[]} />
+      <InstructorsSection />
 
       {/* Call to Action */}
       <CTASection />

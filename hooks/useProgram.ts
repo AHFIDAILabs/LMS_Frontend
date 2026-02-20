@@ -74,7 +74,7 @@ export const usePrograms = (params?: {
       if (isMounted.current) setLoading(false);
       fetchingRef.current = false;
     }
-  }, [JSON.stringify(params)]);
+  }, [params]);
 
   useEffect(() => {
     isMounted.current = true;
